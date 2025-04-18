@@ -1,0 +1,63 @@
+{
+  "id": "longest-palindromic-substring",
+  "title": "Longest Palindromic Substring",
+  "description": "Given a string `s`, return the longest palindromic substring in `s`.\n\nA palindrome is a string that reads the same backward as forward, like \"madam\" or \"racecar\".",
+  "difficulty": "medium",
+  "category": "String Sorcery",
+  "starterCode": {
+    "javascript": "/**\n * @param {string} s\n * @return {string}\n */\nfunction longestPalindrome(s) {\n  // Your code here\n}",
+    "python": "def longest_palindrome(s):\n    \"\"\"\n    :type s: str\n    :rtype: str\n    \"\"\"\n    # Your code here\n    pass"
+  },
+  "solutionCode": {
+    "javascript": "/**\n * @param {string} s\n * @return {string}\n */\nfunction longestPalindrome(s) {\n  if (!s || s.length < 1) return \"\";\n  \n  let start = 0;\n  let maxLength = 1;\n  \n  function expandAroundCenter(left, right) {\n    while (left >= 0 && right < s.length && s[left] === s[right]) {\n      const currentLength = right - left + 1;\n      if (currentLength > maxLength) {\n        maxLength = currentLength;\n        start = left;\n      }\n      left--;\n      right++;\n    }\n  }\n  \n  for (let i = 0; i < s.length; i++) {\n    // Odd length palindromes\n    expandAroundCenter(i, i);\n    // Even length palindromes\n    expandAroundCenter(i, i + 1);\n  }\n  \n  return s.substring(start, start + maxLength);\n}",
+    "python": "def longest_palindrome(s):\n    if not s:\n        return \"\"\n        \n    start = 0\n    max_length = 1\n    \n    def expand_around_center(left, right):\n        nonlocal start, max_length\n        \n        while left >= 0 and right < len(s) and s[left] == s[right]:\n            current_length = right - left + 1\n            if current_length > max_length:\n                max_length = current_length\n                start = left\n            left -= 1\n            right += 1\n    \n    for i in range(len(s)):\n        # Odd length palindromes\n        expand_around_center(i, i)\n        # Even length palindromes\n        expand_around_center(i, i + 1)\n    \n    return s[start:start + max_length]"
+  },
+  "constraints": [
+    "1 <= s.length <= 1000",
+    "s consist of only digits and English letters."
+  ],
+  "examples": [
+    "Example 1:\nInput: s = \"babad\"\nOutput: \"bab\"\nExplanation: \"aba\" is also a valid answer.",
+    "Example 2:\nInput: s = \"cbbd\"\nOutput: \"bb\"",
+    "Example 3:\nInput: s = \"a\"\nOutput: \"a\""
+  ],
+  "testCases": [
+    {
+      "input": "\"babad\"",
+      "output": "\"bab\"",
+      "isHidden": false
+    },
+    {
+      "input": "\"cbbd\"",
+      "output": "\"bb\"",
+      "isHidden": false
+    },
+    {
+      "input": "\"a\"",
+      "output": "\"a\"",
+      "isHidden": false
+    },
+    {
+      "input": "\"racecar\"",
+      "output": "\"racecar\"",
+      "isHidden": false
+    },
+    {
+      "input": "\"banana\"",
+      "output": "\"anana\"",
+      "isHidden": true
+    },
+    {
+      "input": "\"aacabdkacaa\"",
+      "output": "\"aca\"",
+      "isHidden": true
+    },
+    {
+      "input": "\"abcdefgfedcba\"",
+      "output": "\"abcdefgfedcba\"",
+      "isHidden": true
+    }
+  ],
+  "timeLimit": 1000,
+  "memoryLimit": 128000
+} 

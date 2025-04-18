@@ -1,0 +1,62 @@
+{
+  "id": "best-time-to-buy-sell-stock",
+  "title": "Best Time to Buy and Sell Stock",
+  "description": "You are given an array `prices` where `prices[i]` is the price of a given stock on the `i`th day.\n\nYou want to maximize your profit by choosing a single day to buy one stock and choosing a different day in the future to sell that stock.\n\nReturn the maximum profit you can achieve from this transaction. If you cannot achieve any profit, return 0.",
+  "difficulty": "easy",
+  "category": "Forest of Arrays",
+  "starterCode": {
+    "javascript": "/**\n * @param {number[]} prices\n * @return {number}\n */\nfunction maxProfit(prices) {\n  // Your code here\n}",
+    "python": "def max_profit(prices):\n    \"\"\"\n    :type prices: List[int]\n    :rtype: int\n    \"\"\"\n    # Your code here\n    pass"
+  },
+  "solutionCode": {
+    "javascript": "/**\n * @param {number[]} prices\n * @return {number}\n */\nfunction maxProfit(prices) {\n  let maxProfit = 0;\n  let minPrice = Infinity;\n  \n  for (let i = 0; i < prices.length; i++) {\n    if (prices[i] < minPrice) {\n      minPrice = prices[i];\n    } else if (prices[i] - minPrice > maxProfit) {\n      maxProfit = prices[i] - minPrice;\n    }\n  }\n  \n  return maxProfit;\n}",
+    "python": "def max_profit(prices):\n    max_profit = 0\n    min_price = float('inf')\n    \n    for price in prices:\n        if price < min_price:\n            min_price = price\n        elif price - min_price > max_profit:\n            max_profit = price - min_price\n    \n    return max_profit"
+  },
+  "constraints": [
+    "1 <= prices.length <= 10^5",
+    "0 <= prices[i] <= 10^4"
+  ],
+  "examples": [
+    "Example 1:\nInput: prices = [7,1,5,3,6,4]\nOutput: 5\nExplanation: Buy on day 2 (price = 1) and sell on day 5 (price = 6), profit = 6-1 = 5.\nNote that buying on day 2 and selling on day 1 is not allowed because you must buy before you sell.",
+    "Example 2:\nInput: prices = [7,6,4,3,1]\nOutput: 0\nExplanation: In this case, no transactions are done and the max profit = 0."
+  ],
+  "testCases": [
+    {
+      "input": "[7,1,5,3,6,4]",
+      "output": "5",
+      "isHidden": false
+    },
+    {
+      "input": "[7,6,4,3,1]",
+      "output": "0",
+      "isHidden": false
+    },
+    {
+      "input": "[2,4,1]",
+      "output": "2",
+      "isHidden": false
+    },
+    {
+      "input": "[2,1,2,1,0,1,2]",
+      "output": "2",
+      "isHidden": false
+    },
+    {
+      "input": "[3,3,5,0,0,3,1,4]",
+      "output": "4",
+      "isHidden": true
+    },
+    {
+      "input": "[1,2,3,4,5]",
+      "output": "4",
+      "isHidden": true
+    },
+    {
+      "input": "[2,1,4]",
+      "output": "3",
+      "isHidden": true
+    }
+  ],
+  "timeLimit": 1000,
+  "memoryLimit": 128000
+} 

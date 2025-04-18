@@ -1,0 +1,62 @@
+{
+  "id": "palindrome-substrings",
+  "title": "Palindrome Substrings",
+  "description": "Given a string `s`, return the number of palindromic substrings in it.\n\nA string is a palindrome when it reads the same backward as forward.\n\nA substring is a contiguous sequence of characters within the string.",
+  "difficulty": "medium",
+  "category": "String Sorcery",
+  "starterCode": {
+    "javascript": "/**\n * @param {string} s\n * @return {number}\n */\nfunction countSubstrings(s) {\n  // Your code here\n}",
+    "python": "def count_substrings(s):\n    \"\"\"\n    :type s: str\n    :rtype: int\n    \"\"\"\n    # Your code here\n    pass"
+  },
+  "solutionCode": {
+    "javascript": "/**\n * @param {string} s\n * @return {number}\n */\nfunction countSubstrings(s) {\n  let count = 0;\n  \n  // Helper function to count palindromes centered at given indices\n  function expandAroundCenter(left, right) {\n    while (left >= 0 && right < s.length && s[left] === s[right]) {\n      count++;\n      left--;\n      right++;\n    }\n  }\n  \n  for (let i = 0; i < s.length; i++) {\n    // Odd length palindromes\n    expandAroundCenter(i, i);\n    // Even length palindromes\n    expandAroundCenter(i, i + 1);\n  }\n  \n  return count;\n}",
+    "python": "def count_substrings(s):\n    count = 0\n    \n    def expand_around_center(left, right):\n        nonlocal count\n        while left >= 0 and right < len(s) and s[left] == s[right]:\n            count += 1\n            left -= 1\n            right += 1\n    \n    for i in range(len(s)):\n        # Odd length palindromes\n        expand_around_center(i, i)\n        # Even length palindromes\n        expand_around_center(i, i + 1)\n    \n    return count"
+  },
+  "constraints": [
+    "1 <= s.length <= 1000",
+    "s consists of lowercase English letters."
+  ],
+  "examples": [
+    "Example 1:\nInput: s = \"abc\"\nOutput: 3\nExplanation: Three palindromic strings: \"a\", \"b\", \"c\".",
+    "Example 2:\nInput: s = \"aaa\"\nOutput: 6\nExplanation: Six palindromic strings: \"a\", \"a\", \"a\", \"aa\", \"aa\", \"aaa\"."
+  ],
+  "testCases": [
+    {
+      "input": "\"abc\"",
+      "output": "3",
+      "isHidden": false
+    },
+    {
+      "input": "\"aaa\"",
+      "output": "6",
+      "isHidden": false
+    },
+    {
+      "input": "\"racecar\"",
+      "output": "10",
+      "isHidden": false
+    },
+    {
+      "input": "\"\"",
+      "output": "0",
+      "isHidden": false
+    },
+    {
+      "input": "\"abba\"",
+      "output": "6",
+      "isHidden": true
+    },
+    {
+      "input": "\"madam\"",
+      "output": "7",
+      "isHidden": true
+    },
+    {
+      "input": "\"aaaaa\"",
+      "output": "15",
+      "isHidden": true
+    }
+  ],
+  "timeLimit": 1000,
+  "memoryLimit": 128000
+} 

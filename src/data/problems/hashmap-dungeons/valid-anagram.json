@@ -1,0 +1,57 @@
+{
+  "id": "valid-anagram",
+  "title": "Valid Anagram",
+  "description": "Given two strings `s` and `t`, return `true` if `t` is an anagram of `s`, and `false` otherwise.\n\nAn Anagram is a word or phrase formed by rearranging the letters of a different word or phrase, typically using all the original letters exactly once.",
+  "difficulty": "easy",
+  "category": "Hashmap Dungeons",
+  "starterCode": {
+    "javascript": "/**\n * @param {string} s\n * @param {string} t\n * @return {boolean}\n */\nfunction isAnagram(s, t) {\n  // Your code here\n}",
+    "python": "def is_anagram(s, t):\n    \"\"\"\n    :type s: str\n    :type t: str\n    :rtype: bool\n    \"\"\"\n    # Your code here\n    pass"
+  },
+  "solutionCode": {
+    "javascript": "/**\n * @param {string} s\n * @param {string} t\n * @return {boolean}\n */\nfunction isAnagram(s, t) {\n  if (s.length !== t.length) return false;\n  \n  const charCount = {};\n  \n  // Count occurrences of each character in s\n  for (let char of s) {\n    charCount[char] = (charCount[char] || 0) + 1;\n  }\n  \n  // Decrement counts for each character in t\n  for (let char of t) {\n    if (!charCount[char]) return false;\n    charCount[char]--;\n  }\n  \n  // Check if all counts are zero\n  return Object.values(charCount).every(count => count === 0);\n}",
+    "python": "def is_anagram(s, t):\n    if len(s) != len(t):\n        return False\n    \n    char_count = {}\n    \n    # Count occurrences of each character in s\n    for char in s:\n        char_count[char] = char_count.get(char, 0) + 1\n    \n    # Decrement counts for each character in t\n    for char in t:\n        if char not in char_count or char_count[char] == 0:\n            return False\n        char_count[char] -= 1\n    \n    # Check if all counts are zero\n    return all(count == 0 for count in char_count.values())"
+  },
+  "constraints": [
+    "1 <= s.length, t.length <= 5 * 10^4",
+    "s and t consist of lowercase English letters."
+  ],
+  "examples": [
+    "Example 1:\nInput: s = \"anagram\", t = \"nagaram\"\nOutput: true",
+    "Example 2:\nInput: s = \"rat\", t = \"car\"\nOutput: false"
+  ],
+  "testCases": [
+    {
+      "input": "\"anagram\", \"nagaram\"",
+      "output": "true",
+      "isHidden": false
+    },
+    {
+      "input": "\"rat\", \"car\"",
+      "output": "false",
+      "isHidden": false
+    },
+    {
+      "input": "\"a\", \"a\"",
+      "output": "true",
+      "isHidden": false
+    },
+    {
+      "input": "\"ab\", \"a\"",
+      "output": "false",
+      "isHidden": false
+    },
+    {
+      "input": "\"aacc\", \"ccac\"",
+      "output": "false",
+      "isHidden": true
+    },
+    {
+      "input": "\"listen\", \"silent\"",
+      "output": "true",
+      "isHidden": true
+    }
+  ],
+  "timeLimit": 1000,
+  "memoryLimit": 128000
+} 

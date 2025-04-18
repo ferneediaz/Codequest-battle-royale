@@ -1,0 +1,58 @@
+{
+  "id": "valid-palindrome",
+  "title": "Valid Palindrome",
+  "description": "A phrase is a palindrome if, after converting all uppercase letters into lowercase letters and removing all non-alphanumeric characters, it reads the same forward and backward. Alphanumeric characters include letters and numbers.\n\nGiven a string `s`, return `true` if it is a palindrome, or `false` otherwise.",
+  "difficulty": "easy",
+  "category": "String Sorcery",
+  "starterCode": {
+    "javascript": "/**\n * @param {string} s\n * @return {boolean}\n */\nfunction isPalindrome(s) {\n  // Your code here\n}",
+    "python": "def is_palindrome(s):\n    \"\"\"\n    :type s: str\n    :rtype: bool\n    \"\"\"\n    # Your code here\n    pass"
+  },
+  "solutionCode": {
+    "javascript": "/**\n * @param {string} s\n * @return {boolean}\n */\nfunction isPalindrome(s) {\n  // Convert to lowercase and remove non-alphanumeric characters\n  s = s.toLowerCase().replace(/[^a-z0-9]/g, '');\n  \n  // Check if it's a palindrome using two pointers\n  let left = 0;\n  let right = s.length - 1;\n  \n  while (left < right) {\n    if (s[left] !== s[right]) {\n      return false;\n    }\n    left++;\n    right--;\n  }\n  \n  return true;\n}",
+    "python": "def is_palindrome(s):\n    # Convert to lowercase and remove non-alphanumeric characters\n    s = ''.join(char.lower() for char in s if char.isalnum())\n    \n    # Check if it's a palindrome\n    return s == s[::-1]"
+  },
+  "constraints": [
+    "1 <= s.length <= 2 * 10^5",
+    "s consists only of printable ASCII characters."
+  ],
+  "examples": [
+    "Example 1:\nInput: s = \"A man, a plan, a canal: Panama\"\nOutput: true\nExplanation: \"amanaplanacanalpanama\" is a palindrome.",
+    "Example 2:\nInput: s = \"race a car\"\nOutput: false\nExplanation: \"raceacar\" is not a palindrome.",
+    "Example 3:\nInput: s = \" \"\nOutput: true\nExplanation: s is an empty string \"\" after removing non-alphanumeric characters. Since an empty string reads the same forward and backward, it is a palindrome."
+  ],
+  "testCases": [
+    {
+      "input": "\"A man, a plan, a canal: Panama\"",
+      "output": "true",
+      "isHidden": false
+    },
+    {
+      "input": "\"race a car\"",
+      "output": "false",
+      "isHidden": false
+    },
+    {
+      "input": "\" \"",
+      "output": "true",
+      "isHidden": false
+    },
+    {
+      "input": "\"0P\"",
+      "output": "false",
+      "isHidden": false
+    },
+    {
+      "input": "\"Was it a car or a cat I saw?\"",
+      "output": "true",
+      "isHidden": true
+    },
+    {
+      "input": "\"No 'x' in Nixon\"",
+      "output": "true",
+      "isHidden": true
+    }
+  ],
+  "timeLimit": 1000,
+  "memoryLimit": 128000
+} 

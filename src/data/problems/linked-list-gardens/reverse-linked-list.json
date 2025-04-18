@@ -1,0 +1,58 @@
+{
+  "id": "reverse-linked-list",
+  "title": "Reverse Linked List",
+  "description": "Given the `head` of a singly linked list, reverse the list, and return the reversed list.",
+  "difficulty": "easy",
+  "category": "Linked List Gardens",
+  "starterCode": {
+    "javascript": "/**\n * Definition for singly-linked list.\n * function ListNode(val, next) {\n *     this.val = (val===undefined ? 0 : val)\n *     this.next = (next===undefined ? null : next)\n * }\n */\n/**\n * @param {ListNode} head\n * @return {ListNode}\n */\nfunction reverseList(head) {\n  // Your code here\n}",
+    "python": "# Definition for singly-linked list.\n# class ListNode:\n#     def __init__(self, val=0, next=None):\n#         self.val = val\n#         self.next = next\nclass Solution:\n    def reverseList(self, head):\n        \"\"\"\n        :type head: ListNode\n        :rtype: ListNode\n        \"\"\"\n        # Your code here\n        pass"
+  },
+  "solutionCode": {
+    "javascript": "/**\n * Definition for singly-linked list.\n * function ListNode(val, next) {\n *     this.val = (val===undefined ? 0 : val)\n *     this.next = (next===undefined ? null : next)\n * }\n */\n/**\n * @param {ListNode} head\n * @return {ListNode}\n */\nfunction reverseList(head) {\n  let prev = null;\n  let current = head;\n  \n  while (current !== null) {\n    // Save next node\n    const next = current.next;\n    \n    // Reverse the pointer\n    current.next = prev;\n    \n    // Move pointers one step forward\n    prev = current;\n    current = next;\n  }\n  \n  return prev; // New head of the reversed list\n}",
+    "python": "# Definition for singly-linked list.\n# class ListNode:\n#     def __init__(self, val=0, next=None):\n#         self.val = val\n#         self.next = next\nclass Solution:\n    def reverseList(self, head):\n        prev = None\n        current = head\n        \n        while current:\n            # Save next node\n            next_node = current.next\n            \n            # Reverse the pointer\n            current.next = prev\n            \n            # Move pointers one step forward\n            prev = current\n            current = next_node\n        \n        return prev  # New head of the reversed list"
+  },
+  "constraints": [
+    "The number of nodes in the list is the range [0, 5000]",
+    "-5000 <= Node.val <= 5000"
+  ],
+  "examples": [
+    "Example 1:\n![Reverse Linked List Example](https://assets.leetcode.com/uploads/2021/02/19/rev1ex1.jpg)\nInput: head = [1,2,3,4,5]\nOutput: [5,4,3,2,1]",
+    "Example 2:\n![Reverse Linked List Example 2](https://assets.leetcode.com/uploads/2021/02/19/rev1ex2.jpg)\nInput: head = [1,2]\nOutput: [2,1]",
+    "Example 3:\nInput: head = []\nOutput: []"
+  ],
+  "testCases": [
+    {
+      "input": "[1,2,3,4,5]",
+      "output": "[5,4,3,2,1]",
+      "isHidden": false
+    },
+    {
+      "input": "[1,2]",
+      "output": "[2,1]",
+      "isHidden": false
+    },
+    {
+      "input": "[]",
+      "output": "[]",
+      "isHidden": false
+    },
+    {
+      "input": "[1]",
+      "output": "[1]",
+      "isHidden": false
+    },
+    {
+      "input": "[1,2,3]",
+      "output": "[3,2,1]",
+      "isHidden": true
+    },
+    {
+      "input": "[5,4,3,2,1]",
+      "output": "[1,2,3,4,5]",
+      "isHidden": true
+    }
+  ],
+  "timeLimit": 1000,
+  "memoryLimit": 128000
+} 

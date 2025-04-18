@@ -1,0 +1,58 @@
+{
+  "id": "container-with-most-water",
+  "title": "Container With Most Water",
+  "description": "You are given an integer array `height` of length `n`. There are `n` vertical lines drawn such that the two endpoints of the `i`th line are `(i, 0)` and `(i, height[i])`.\n\nFind two lines that together with the x-axis form a container, such that the container contains the most water.\n\nReturn the maximum amount of water a container can store.\n\nNotice that you may not slant the container.",
+  "difficulty": "medium",
+  "category": "Forest of Arrays",
+  "starterCode": {
+    "javascript": "/**\n * @param {number[]} height\n * @return {number}\n */\nfunction maxArea(height) {\n  // Your code here\n}",
+    "python": "def max_area(height):\n    \"\"\"\n    :type height: List[int]\n    :rtype: int\n    \"\"\"\n    # Your code here\n    pass"
+  },
+  "solutionCode": {
+    "javascript": "/**\n * @param {number[]} height\n * @return {number}\n */\nfunction maxArea(height) {\n  let maxArea = 0;\n  let left = 0;\n  let right = height.length - 1;\n  \n  while (left < right) {\n    // Calculate the area\n    const width = right - left;\n    const h = Math.min(height[left], height[right]);\n    const area = width * h;\n    \n    // Update maxArea if current area is larger\n    maxArea = Math.max(maxArea, area);\n    \n    // Move the pointer with the smaller height\n    if (height[left] < height[right]) {\n      left++;\n    } else {\n      right--;\n    }\n  }\n  \n  return maxArea;\n}",
+    "python": "def max_area(height):\n    max_area = 0\n    left = 0\n    right = len(height) - 1\n    \n    while left < right:\n        # Calculate the area\n        width = right - left\n        h = min(height[left], height[right])\n        area = width * h\n        \n        # Update max_area if current area is larger\n        max_area = max(max_area, area)\n        \n        # Move the pointer with the smaller height\n        if height[left] < height[right]:\n            left += 1\n        else:\n            right -= 1\n    \n    return max_area"
+  },
+  "constraints": [
+    "n == height.length",
+    "2 <= n <= 10^5",
+    "0 <= height[i] <= 10^4"
+  ],
+  "examples": [
+    "Example 1:\nInput: height = [1,8,6,2,5,4,8,3,7]\nOutput: 49\nExplanation: The above vertical lines are represented by array [1,8,6,2,5,4,8,3,7]. In this case, the max area of water the container can contain is 49.",
+    "Example 2:\nInput: height = [1,1]\nOutput: 1"
+  ],
+  "testCases": [
+    {
+      "input": "[1,8,6,2,5,4,8,3,7]",
+      "output": "49",
+      "isHidden": false
+    },
+    {
+      "input": "[1,1]",
+      "output": "1",
+      "isHidden": false
+    },
+    {
+      "input": "[4,3,2,1,4]",
+      "output": "16",
+      "isHidden": false
+    },
+    {
+      "input": "[1,2,1]",
+      "output": "2",
+      "isHidden": false
+    },
+    {
+      "input": "[1,8,100,2,100,4,8,3,7]",
+      "output": "200",
+      "isHidden": true
+    },
+    {
+      "input": "[1,3,2,5,25,24,5]",
+      "output": "24",
+      "isHidden": true
+    }
+  ],
+  "timeLimit": 1000,
+  "memoryLimit": 128000
+} 
