@@ -72,26 +72,53 @@ class SubmissionService {
    * Submit code to Judge0 and get results
    */
   async submitCode(submission: JudgeSubmission): Promise<JudgeResult> {
-    // If no Judge0 API key is configured, use mock mode
-    if (!JUDGE0_API_KEY) {
+    // If no Judge0 API key is configured, use mock mode or connect to local instance
+    // But always use the API if running against a local Judge0 instance
+    if (!JUDGE0_API_KEY && !JUDGE0_API_URL.includes('localhost')) {
       console.log('No Judge0 API key found, using mock mode');
       return this.mockSubmission(submission);
     }
     
     try {
+      // Prepare code for submission - add output for array problems
+      let modifiedCode = submission.source_code;
+      
+      // For array problems like the merge function, add auto-printing of result
+      if (submission.stdin.includes('[') && (
+          modifiedCode.includes('function merge(') || 
+          modifiedCode.includes('var merge =') || 
+          modifiedCode.includes('const merge =')
+      )) {
+        // Add a wrapper that processes the input and prints output
+        modifiedCode = this.addPrintOutputForMergeProblem(modifiedCode, submission.stdin);
+      }
+      
+      console.log('Submitting code to Judge0 at:', JUDGE0_API_URL);
+      
+      // Headers for the API request
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      // Only add API key headers if they exist
+      if (JUDGE0_API_KEY) {
+        headers['X-RapidAPI-Key'] = JUDGE0_API_KEY;
+        headers['X-RapidAPI-Host'] = JUDGE0_API_HOST || '';
+      }
+      
       // First create a submission
       const response = await fetch(`${JUDGE0_API_URL}/submissions`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-RapidAPI-Key': JUDGE0_API_KEY,
-          'X-RapidAPI-Host': JUDGE0_API_HOST
-        },
-        body: JSON.stringify(submission)
+        headers,
+        body: JSON.stringify({
+          ...submission,
+          source_code: modifiedCode
+        })
       });
       
       if (!response.ok) {
-        throw new Error(`Failed to create submission: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Failed to create submission: ${response.status} ${response.statusText}\n${errorText}`);
       }
       
       const submissionData = await response.json();
@@ -116,6 +143,34 @@ class SubmissionService {
   }
   
   /**
+   * Add code to print the output for the merge problem
+   */
+  private addPrintOutputForMergeProblem(code: string, input: string): string {
+    // Create a version of the code that includes printing the output
+    const originalCode = code;
+    
+    // Extract the input parameters - updated regex to handle empty arrays
+    const match = input.match(/(\[.*?\])\s*,\s*(\d+)\s*,\s*(\[.*?\])\s*,\s*(\d+)/);
+    if (!match) return code;
+    
+    const [_, nums1Str, mStr, nums2Str, nStr] = match;
+    
+    // Create a complete solution with the original code plus output printing
+    return `${originalCode}
+
+// Auto-added output code for Judge0
+const nums1 = ${nums1Str};
+const m = ${mStr};
+const nums2 = ${nums2Str};
+const n = ${nStr};
+
+merge(nums1, m, nums2, n);
+
+// Print the result for Judge0 to check
+console.log(JSON.stringify(nums1));`;
+  }
+  
+  /**
    * Get results of a previous submission
    */
   private async getSubmissionResult(token: string): Promise<JudgeResult> {
@@ -124,18 +179,25 @@ class SubmissionService {
       let attempts = 0;
       const maxAttempts = 10;
       
+      // Headers for the API request
+      const headers: Record<string, string> = {};
+      
+      // Only add API key headers if they exist
+      if (JUDGE0_API_KEY) {
+        headers['X-RapidAPI-Key'] = JUDGE0_API_KEY;
+        headers['X-RapidAPI-Host'] = JUDGE0_API_HOST || '';
+      }
+      
       // Poll for results with exponential backoff
       while (!result && attempts < maxAttempts) {
         const response = await fetch(`${JUDGE0_API_URL}/submissions/${token}`, {
           method: 'GET',
-          headers: {
-            'X-RapidAPI-Key': JUDGE0_API_KEY,
-            'X-RapidAPI-Host': JUDGE0_API_HOST
-          }
+          headers
         });
         
         if (!response.ok) {
-          throw new Error(`Failed to get submission result: ${response.statusText}`);
+          const errorText = await response.text();
+          throw new Error(`Failed to get submission result: ${response.status} ${response.statusText}\n${errorText}`);
         }
         
         const data = await response.json();
@@ -242,20 +304,72 @@ class SubmissionService {
           try {
             ${submission.source_code}
             
-            // For testing, assume the last expression is the function call
-            // This is very naive and just for demonstration
-            const inputLines = \`${submission.stdin}\`.split('\\n');
-            const parsed = inputLines.map(line => {
-              try { return JSON.parse(line); } 
-              catch { return line; }
-            });
+            // Parse input - handle array problems specifically
+            const inputStr = \`${submission.stdin}\`;
+            console.log("Processing input:", inputStr);
             
-            // Try to find a function to call
-            const fnMatch = ${submission.source_code}.match(/function\\s+([a-zA-Z0-9_]+)\\s*\\(/);
-            if (fnMatch && fnMatch[1]) {
-              const result = eval(fnMatch[1] + '(' + parsed + ')');
-              if (result !== undefined) {
-                console.log(JSON.stringify(result));
+            // For Merge Sorted Array problem
+            if (inputStr.includes('[') && inputStr.includes(']')) {
+              try {
+                // Try to parse as JSON arrays and numbers
+                const parts = inputStr.split(',').map(part => part.trim());
+                const params = [];
+                
+                let currentStr = '';
+                let bracketCount = 0;
+                
+                // Parse input ensuring we handle nested arrays correctly
+                for (let i = 0; i < parts.length; i++) {
+                  const part = parts[i];
+                  
+                  currentStr += (i > 0 ? ',' : '') + part;
+                  
+                  bracketCount += (part.match(/\\[/g) || []).length;
+                  bracketCount -= (part.match(/\\]/g) || []).length;
+                  
+                  if (bracketCount === 0 && currentStr.trim() !== '') {
+                    // Try to parse as JSON, fall back to string if it fails
+                    try {
+                      // If it's a complete array
+                      if (currentStr.trim().startsWith('[') && currentStr.trim().endsWith(']')) {
+                        params.push(JSON.parse(currentStr));
+                      } else {
+                        // If it's just a number
+                        params.push(parseInt(currentStr));
+                      }
+                    } catch (e) {
+                      params.push(currentStr);
+                    }
+                    currentStr = '';
+                  }
+                }
+                
+                // Find merge function
+                if (submission.source_code.includes('function merge') && params.length >= 3) {
+                  const result = merge(...params);
+                  
+                  // The result should already be logged by the function itself
+                  // We don't need to do anything extra here
+                }
+              } catch (e) {
+                console.error("Error parsing input:", e);
+                output += "Error: " + e.message + "\\n";
+              }
+            } else {
+              // Fall back to generic function detection
+              const fnMatch = ${submission.source_code}.match(/function\\s+([a-zA-Z0-9_]+)\\s*\\(/);
+              if (fnMatch && fnMatch[1]) {
+                try {
+                  // Simple string splitting for basic input parsing
+                  const inputParts = inputStr.split(',').map(p => p.trim());
+                  const result = eval(fnMatch[1] + '(' + inputParts.join(',') + ')');
+                  if (result !== undefined && typeof result !== 'undefined') {
+                    console.log(JSON.stringify(result));
+                  }
+                } catch (e) {
+                  console.error("Error calling function:", e);
+                  output += "Error: " + e.message + "\\n";
+                }
               }
             }
             
@@ -337,6 +451,12 @@ class SubmissionService {
     passed: number;
     total: number;
     results: JudgeResult[];
+    failedTests?: Array<{
+      input: string;
+      expected: string;
+      actual: string;
+      index: number;
+    }>;
   }> {
     const languageId = LANGUAGE_IDS[language as keyof typeof LANGUAGE_IDS];
     if (!languageId) {
@@ -345,8 +465,15 @@ class SubmissionService {
     
     const results: JudgeResult[] = [];
     let passed = 0;
+    const failedTests: Array<{
+      input: string;
+      expected: string;
+      actual: string;
+      index: number;
+    }> = [];
     
-    for (const testCase of testCases) {
+    for (let i = 0; i < testCases.length; i++) {
+      const testCase = testCases[i];
       const result = await this.submitCode({
         source_code: code,
         language_id: languageId,
@@ -360,13 +487,22 @@ class SubmissionService {
       
       if (result.status.id === JUDGE_STATUS.ACCEPTED) {
         passed++;
+      } else {
+        // Collect details about failed test
+        failedTests.push({
+          input: testCase.input,
+          expected: testCase.output,
+          actual: result.stdout || "No output",
+          index: i + 1
+        });
       }
     }
     
     return {
       passed,
       total: testCases.length,
-      results
+      results,
+      failedTests: failedTests.length > 0 ? failedTests : undefined
     };
   }
 }

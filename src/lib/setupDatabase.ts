@@ -63,7 +63,8 @@ export async function setupBattleSessionsTable(): Promise<{success: boolean, mes
           last_left_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
           ready_users TEXT[] DEFAULT '{}'::TEXT[],
           topic_selections JSONB DEFAULT '{}'::JSONB,
-          selected_topics TEXT[] DEFAULT '{}'::TEXT[]
+          selected_topics TEXT[] DEFAULT '{}'::TEXT[],
+          battle_state TEXT DEFAULT 'topic_selection'
         );
         
         -- Add connected_emails column if it doesn't exist yet (for backward compatibility)
@@ -136,6 +137,16 @@ export async function setupBattleSessionsTable(): Promise<{success: boolean, mes
             AND column_name = 'selected_topics'
           ) THEN
             ALTER TABLE public.battle_sessions ADD COLUMN selected_topics TEXT[] DEFAULT '{}'::TEXT[];
+          END IF;
+          
+          -- Add battle_state column if it doesn't exist
+          IF NOT EXISTS (
+            SELECT FROM information_schema.columns 
+            WHERE table_schema = 'public' 
+            AND table_name = 'battle_sessions' 
+            AND column_name = 'battle_state'
+          ) THEN
+            ALTER TABLE public.battle_sessions ADD COLUMN battle_state TEXT DEFAULT 'topic_selection';
           END IF;
         END
         $$;

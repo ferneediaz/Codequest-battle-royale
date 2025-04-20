@@ -14,6 +14,7 @@ export type BattleSession = {
   topic_selections?: Record<string, string[]>;  // Map of user email to their selected topics
   updated_at?: string;  // Timestamp of last update
   heartbeats?: Record<string, number>;  // Map of user email to their last heartbeat timestamp
+  battle_state?: string;  // Current state of the battle ('topic_selection' or 'battle_room')
 };
 
 export type Database = {

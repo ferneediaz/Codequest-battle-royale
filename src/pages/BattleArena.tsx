@@ -15,6 +15,9 @@ import FloatingCodeBackground from '../components/FloatingCodeBackground';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
+// Import the confetti CSS
+import '../styles/confetti.css';
+
 // Import extracted components
 import DraggableSkill from '../components/battle-arena/DraggableSkill';
 import DroppablePlayer from '../components/battle-arena/DroppablePlayer';
@@ -43,12 +46,96 @@ import {
 // Import utility functions
 import { getAvatarUrl } from '../utils/battleUtils';
 
+// Import the Tabs components
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ChevronDown, ChevronRight } from 'lucide-react';
+
 // Extend window interface for global access
 declare global {
   interface Window {
     battleReadinessChannel: any;
   }
 }
+
+// Add this TestResultItem component for displaying each test case result
+const TestResultItem = ({ 
+  index, 
+  input, 
+  expected, 
+  actual, 
+  passed,
+  assertions = 2
+}: { 
+  index: string | number; 
+  input?: string; 
+  expected?: string; 
+  actual?: string; 
+  passed: boolean;
+  assertions?: number;
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  return (
+    <div className={`border-b border-gray-700 py-2 px-4 hover:bg-gray-800/50`}>
+      <div 
+        className="flex items-center cursor-pointer text-sm" 
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="mr-2">
+          {isExpanded ? 
+            <ChevronDown className="w-4 h-4 text-gray-400" /> : 
+            <ChevronRight className="w-4 h-4 text-gray-400" />
+          }
+        </div>
+        <div className={`font-mono ${passed ? 'text-green-400' : 'text-red-400'} flex-1`}>
+          {passed ? '✓' : '✗'} {index} ({assertions} of {assertions} Assertions)
+        </div>
+      </div>
+      
+      {isExpanded && input && expected && (
+        <div className="pl-6 mt-2 space-y-2 text-sm">
+          <div>
+            <div className="text-gray-400 mb-1">Input:</div>
+            <div className="text-white bg-gray-900 p-2 rounded font-mono overflow-x-auto whitespace-pre">{input}</div>
+          </div>
+          
+          <div>
+            <div className="text-gray-400 mb-1">Expected:</div>
+            <div className="text-green-400 bg-gray-900 p-2 rounded font-mono overflow-x-auto whitespace-pre">{expected}</div>
+          </div>
+          
+          {!passed && actual && (
+            <div>
+              <div className="text-gray-400 mb-1">Your Output:</div>
+              <div className="text-red-400 bg-gray-900 p-2 rounded font-mono overflow-x-auto whitespace-pre">{actual}</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Add a confetti effect component for success celebration
+const Confetti = ({ active }: { active: boolean }) => {
+  if (!active) return null;
+  
+  return (
+    <div className="confetti-container">
+      {Array.from({ length: 100 }).map((_, i) => (
+        <div 
+          key={i} 
+          className="confetti" 
+          style={{
+            left: `${Math.random() * 100}%`,
+            animationDelay: `${Math.random() * 3}s`,
+            backgroundColor: ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'][Math.floor(Math.random() * 6)]
+          }}
+        />
+      ))}
+    </div>
+  );
+};
 
 // Main component
 const BattleArena: React.FC = () => {
@@ -75,7 +162,29 @@ const BattleArena: React.FC = () => {
   
   // Add state for selected language
   const [selectedLanguage, setSelectedLanguage] = useState<string>('javascript');
-  const [userCode, setUserCode] = useState<string>('// Write your solution here');
+  const [userCode, setUserCode] = useState<string>(`/**
+ * @param {number[]} nums1
+ * @param {number} m
+ * @param {number[]} nums2
+ * @param {number} n
+ * @return {void} Do not return anything, modify nums1 in-place instead.
+ */
+function merge(nums1, m, nums2, n) {
+  let p1 = m - 1;
+  let p2 = n - 1;
+  let p = m + n - 1;
+  
+  while (p2 >= 0) {
+    if (p1 >= 0 && nums1[p1] > nums2[p2]) {
+      nums1[p] = nums1[p1];
+      p1--;
+    } else {
+      nums1[p] = nums2[p2];
+      p2--;
+    }
+    p--;
+  }
+}`);
   
   // Track initialization to prevent re-initializing when tab regains focus
   const hasInitializedRef = useRef(false);
@@ -124,6 +233,34 @@ const BattleArena: React.FC = () => {
     backToQuestionList
   } = useQuestionLoader();
 
+  // Add state for test results
+  const [testResults, setTestResults] = useState<{
+    passed: number; 
+    total: number;
+    failedTests?: Array<{
+      input: string;
+      expected: string;
+      actual: string;
+      index: number;
+    }>
+  } | null>(null);
+  const [isRunningTests, setIsRunningTests] = useState(false);
+
+  // Add state for active tab
+  const [activeTabValue, setActiveTabValue] = useState('instructions');
+
+  // Add state for which view is selected in the battle UI
+  const [activeView, setActiveView] = useState<'instructions' | 'output'>('instructions');
+
+  // Add state for celebration animation
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  // In the BattleArena component, add state to track completed questions
+  const [completedQuestions, setCompletedQuestions] = useState<{ [userId: string]: string[] }>({});
+
+  // Add new state for submission loading
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // Check if database exists and set it up if needed
   useEffect(() => {
     // Only run initialization once, regardless of sessionId
@@ -145,95 +282,31 @@ const BattleArena: React.FC = () => {
         return;
       }
 
-      // Skip database setup and directly connect to the session
+      // Try to join the battle
       if (user?.email) {
         try {
-          console.log('Directly connecting user:', user.email);
+          console.log('Connecting user:', user.email);
           
-          // First check if session exists
-          const { data: session, error: sessionError } = await supabase
-            .from('battle_sessions')
-            .select('*')
-            .eq('id', 'default-battle-session')
-            .single();
-          
-          if (sessionError) {
-            console.log('Error fetching session:', sessionError);
-            setDebugMsg('Error connecting to battle. Try again.');
-            setIsJoining(false);
-            return;
-          }
+          // Join battle using the battle service
+          const session = await battleService.joinBattle(user.email);
           
           if (session) {
-            console.log('Found existing session:', session);
-            
-            // Get current emails
-            const emails = Array.isArray(session.connected_emails) 
-              ? session.connected_emails 
-              : [];
-              
-            // Add current user if not already in list
-            if (!emails.includes(user.email)) {
-              emails.push(user.email);
-            }
-            
-            // Update session
-            const { data: updatedSession, error } = await supabase
-              .from('battle_sessions')
-              .update({ 
-                connected_emails: emails,
-                active_users: emails.length,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', 'default-battle-session')
-              .select('*')
-              .single();
-              
-            if (error) {
-              console.error('Error updating session:', error);
-              setDebugMsg(`Error connecting: ${error.message}`);
-              setIsJoining(false);
-            } else {
-              console.log('Successfully connected:', updatedSession);
-              setSessionId('default-battle-session');
-              setConnectedUsers(emails);
-              setPlayerCount(emails.length);
-              setSetupStatus('verified');
-              setDebugMsg(emails.length > 1 ? 
-                `Connected with ${emails.length} warriors!` : 
-                'Connected! Waiting for other warriors...');
-              setIsJoining(false);
-            }
+            console.log('Successfully connected:', session);
+            const connectedEmails = session.connected_emails || [];
+            setSessionId('default-battle-session');
+            setConnectedUsers(connectedEmails);
+            setPlayerCount(connectedEmails.length);
+            setSetupStatus('verified');
+            setDebugMsg(connectedEmails.length > 1 ? 
+              `Connected with ${connectedEmails.length} warriors!` : 
+              'Connected! Waiting for other warriors...');
           } else {
-            // Create new session if it doesn't exist (unlikely)
-            const { data: newSession, error } = await supabase
-              .from('battle_sessions')
-              .insert({
-                id: 'default-battle-session',
-                active_users: 1,
-                connected_emails: [user.email],
-                updated_at: new Date().toISOString()
-              })
-              .select('*')
-              .single();
-              
-            if (error) {
-              console.error('Error creating session:', error);
-              setDebugMsg(`Error connecting: ${error.message}`);
-              setIsJoining(false);
-            } else {
-              console.log('Created new session:', newSession);
-              setSessionId('default-battle-session');
-              setConnectedUsers([user.email]);
-              setPlayerCount(1);
-              setSetupStatus('verified');
-              setDebugMsg('Connected! Waiting for other warriors...');
-              setIsJoining(false);
-            }
+            setDebugMsg('Error connecting to battle. Try again.');
           }
         } catch (err: any) {
           console.error('Connection error:', err);
           setDebugMsg(`Connection error: ${err.message}`);
+        } finally {
           setIsJoining(false);
         }
       } else {
@@ -267,117 +340,114 @@ const BattleArena: React.FC = () => {
 
   // Add a handler for topic selection completion using presence
   const completeTopicSelection = async () => {
-    if (selectedTopics.length !== 2) return;
+    if (selectedTopics.length !== 2 || !user?.email) return;
     
     setIsTopicSelectionComplete(true);
     setDebugMsg(`Ready for battle with topics: ${selectedTopics.join(' & ')}`);
     
     try {
-      // Create/get a shared presence channel for readiness
-      const readinessChannel = supabase.channel('battle_readiness', {
-        config: {
-          presence: {
-            key: user?.email || 'anonymous',
-          },
-        }
-      });
+      // Try to use an optimistic update approach with retry logic
+      let updateSuccessful = false;
+      let attempts = 0;
+      const maxAttempts = 3;
       
-      // Listen for presence events
-      readinessChannel
-        .on('presence', { event: 'sync' }, () => {
-          const state = readinessChannel.presenceState();
-          console.log('Realtime presence sync:', state);
-          
-          // Collect ready users from presence state
-          const readyPresenceUsers = Object.keys(state);
-          setReadyUsers(readyPresenceUsers);
-          
-          console.log('Ready users from presence:', readyPresenceUsers);
-        })
-        .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-          console.log('User joined:', key, newPresences);
-          
-          // Update UI when a new user joins
-          setReadyUsers(prev => {
-            if (!prev.includes(key)) {
-              return [...prev, key];
-            }
-            return prev;
-          });
-        })
-        .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-          console.log('User left:', key, leftPresences);
-          
-          // Update UI when a user leaves
-          setReadyUsers(prev => prev.filter(email => email !== key));
-        });
-      
-      // Subscribe to presence channel and track user as ready
-      readinessChannel.subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log('Readiness channel subscribed, tracking presence');
-          
-          // Track this user's presence with selected topics
-          const presenceData = {
-            email: user?.email,
-            topics: selectedTopics,
-            ready: true,
-            timestamp: new Date().toISOString()
-          };
-          
-          await readinessChannel.track(presenceData);
-          console.log('Tracked presence:', presenceData);
-          
-          // Also update the database to ensure persistence
-          const { data } = await supabase
-            .from('battle_sessions')
-            .select('ready_users, topic_selections')
-            .eq('id', 'default-battle-session')
-            .single();
-            
-          if (data) {
-            // Update ready users list
-            const currentReadyUsers = Array.isArray(data?.ready_users) ? data.ready_users : [];
-            if (user?.email && !currentReadyUsers.includes(user.email)) {
-              currentReadyUsers.push(user.email);
-            }
-            
-            // Update topic selections
-            const currentTopicSelections = data?.topic_selections || {};
-            if (user?.email) {
-              currentTopicSelections[user.email] = selectedTopics;
-            }
-            
-            // Update the database
-            await supabase
-              .from('battle_sessions')
-              .update({
-                ready_users: currentReadyUsers,
-                topic_selections: currentTopicSelections,
-                selected_topics: selectedTopics,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', 'default-battle-session');
-              
-            // Immediately update local state
-            setReadyUsers(currentReadyUsers);
-            setShowTopicSelection(false);
+      while (!updateSuccessful && attempts < maxAttempts) {
+        attempts++;
+        
+        // Get current session data
+        const { data: currentSession, error: fetchError } = await supabase
+          .from('battle_sessions')
+          .select('ready_users, topic_selections')
+          .eq('id', 'default-battle-session')
+          .single();
+
+        if (fetchError) {
+          console.error(`Error fetching session (attempt ${attempts}):`, fetchError);
+          if (attempts === maxAttempts) {
+            setDebugMsg('Error updating ready status after multiple attempts');
+            return;
           }
+          // Short delay before retry
+          await new Promise(resolve => setTimeout(resolve, 300));
+          continue;
         }
-      });
-      
-      // Store channel reference for cleanup
-      window.battleReadinessChannel = readinessChannel;
-      
+        
+        // Prepare the updated ready_users array
+        let updatedReadyUsers: string[] = [];
+        if (currentSession?.ready_users) {
+          // Start with existing ready users
+          updatedReadyUsers = Array.isArray(currentSession.ready_users) 
+            ? [...currentSession.ready_users]
+            : [];
+            
+          // Only add the current user if not already in the list
+          if (user?.email && !updatedReadyUsers.includes(user.email)) {
+            updatedReadyUsers.push(user.email);
+          }
+        } else {
+          // If no ready users exist yet, create a new array with just this user
+          updatedReadyUsers = user.email ? [user.email] : [];
+        }
+        
+        // Prepare updated topic selections
+        const updatedTopicSelections = {
+          ...(currentSession?.topic_selections || {}),
+          [user.email]: selectedTopics
+        };
+        
+        // Run the update with our prepared arrays
+        const { error: updateError } = await supabase
+          .from('battle_sessions')
+          .update({
+            ready_users: updatedReadyUsers,
+            topic_selections: updatedTopicSelections,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', 'default-battle-session');
+            
+        if (updateError) {
+          console.error(`Error updating session (attempt ${attempts}):`, updateError);
+          if (attempts === maxAttempts) {
+            setDebugMsg('Error updating ready status after multiple attempts');
+            return;
+          }
+          // Short delay before retry
+          await new Promise(resolve => setTimeout(resolve, 300));
+          continue;
+        }
+        
+        // Update successful
+        updateSuccessful = true;
+        
+        // Update local state
+        setReadyUsers(updatedReadyUsers);
+        setShowTopicSelection(false);
+        
+        console.log('Updated ready status for user:', user.email);
+      }
     } catch (error) {
       console.error('Error setting up readiness:', error);
       setDebugMsg('Error setting up ready status');
     }
   };
 
-  // Handle the submission of a solution
+  // Handle test results from code editor
+  const handleTestRun = (results: any, isRunning: boolean) => {
+    setTestResults(results);
+    setIsRunningTests(isRunning);
+    
+    // Automatically switch to output tab when test results are available
+    if (results && !isRunning) {
+      setActiveView('output');
+    }
+  };
+
+  // Update handleSubmitSolution to use the loading state
   const handleSubmitSolution = () => {
     if (currentQuestion && user?.email) {
+      setDebugMsg('Submitting solution...');
+      setIsSubmitting(true); // Start loading animation
+      
       submissionService.runTestCases(
         userCode, 
         selectedLanguage,
@@ -385,13 +455,56 @@ const BattleArena: React.FC = () => {
       ).then(results => {
         console.log('Submission results:', results);
         
-        // If all tests passed, update score
+        // If all tests passed, update score and show celebration
         if (results.passed === results.total) {
           // Update local score state
           const updatedScores = { ...playerScores };
           const userEmail = user.email || '';
           updatedScores[userEmail] = (updatedScores[userEmail] || 0) + 1;
           setPlayerScores(updatedScores);
+          
+          // Add to completed questions
+          const updatedCompletedQuestions = { ...completedQuestions };
+          if (!updatedCompletedQuestions[userEmail]) {
+            updatedCompletedQuestions[userEmail] = [];
+          }
+          
+          // Only add to completed if not already present
+          if (!updatedCompletedQuestions[userEmail].includes(currentQuestion.id)) {
+            updatedCompletedQuestions[userEmail].push(currentQuestion.id);
+            setCompletedQuestions(updatedCompletedQuestions);
+            
+            // Broadcast the update to other clients
+            const completedChannel = supabase.channel('completed_questions', {
+              config: {
+                broadcast: { self: true }
+              }
+            });
+            
+            completedChannel.subscribe(async (status) => {
+              if (status === 'SUBSCRIBED') {
+                await completedChannel.send({
+                  type: 'broadcast',
+                  event: 'question_completed',
+                  payload: { 
+                    completedQuestions: updatedCompletedQuestions,
+                    user: userEmail,
+                    questionId: currentQuestion.id,
+                    timestamp: new Date().toISOString()
+                  }
+                });
+                
+                setTimeout(() => {
+                  completedChannel.unsubscribe();
+                }, 1000);
+              }
+            });
+          }
+          
+          setDebugMsg(`🎉 Solution successful: ${results.passed}/${results.total} tests passed!`);
+          
+          // Show celebration animation
+          celebrateSuccess();
           
           // Broadcast score update with proper subscription
           const scoreChannel = supabase.channel('battle_scores', {
@@ -425,12 +538,20 @@ const BattleArena: React.FC = () => {
               scoreChannel.unsubscribe();
             }, 1000);
           });
+        } else {
+          // Show a more detailed error message for failed tests
+          if (results.failedTests && results.failedTests.length > 0) {
+            const failedTest = results.failedTests[0]; // Get the first failed test for the message
+            setDebugMsg(`❌ Failed: ${results.passed}/${results.total} tests passed. Check the test results for details.`);
+          } else {
+            setDebugMsg(`Solution submitted: ${results.passed}/${results.total} tests passed`);
+          }
         }
-        
-        setDebugMsg(`Solution submitted: ${results.passed}/${results.total} tests passed`);
+        setIsSubmitting(false); // End loading animation
       }).catch(error => {
         console.error('Error submitting solution:', error);
-        setDebugMsg('Error submitting solution');
+        setDebugMsg(`Error submitting: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        setIsSubmitting(false); // End loading animation on error
       });
     }
   };
@@ -440,6 +561,16 @@ const BattleArena: React.FC = () => {
     loadRandomProblemForBattle(selectedTopics);
     setIsQuestionSelected(true);
     startTimer();
+  };
+
+  // Function to trigger celebration animation
+  const celebrateSuccess = () => {
+    setShowConfetti(true);
+    
+    // Auto-hide confetti after a few seconds
+    setTimeout(() => {
+      setShowConfetti(false);
+    }, 5000);
   };
 
   // Render the appropriate content based on the battle state
@@ -508,6 +639,20 @@ const BattleArena: React.FC = () => {
                 <div className="mt-4 text-sm text-indigo-200">
                   <p>Ready warriors: {readyUsers.map(email => email.split('@')[0]).join(', ') || 'None'}</p>
                   <p>Your status: {readyUsers.includes(user?.email || '') ? 'Ready' : 'Not ready'}</p>
+                  
+                  {/* Just keep the Change Topics button */}
+                  <div className="flex justify-center mt-3">
+                    <Button
+                      className="bg-indigo-700 hover:bg-indigo-800 text-white text-xs px-3 py-1"
+                      onClick={() => {
+                        // Show topic selection again
+                        setShowTopicSelection(true);
+                        setDebugMsg('Returned to topic selection');
+                      }}
+                    >
+                      Change Topics
+                    </Button>
+                  </div>
                 </div>
               )}
               
@@ -516,16 +661,7 @@ const BattleArena: React.FC = () => {
                   <div className="animate-pulse text-green-400 text-xl font-bold">Battle starting...</div>
                   <Button
                     className="mt-4 bg-green-600 hover:bg-green-700 text-white"
-                    onClick={async () => {
-                      // Force transition to battle room if it hasn't happened automatically
-                      setBattleState('battle_room');
-                      
-                      // Load questions from selected topics immediately
-                      await loadQuestionsForSelectedTopics(selectedTopics);
-                      
-                      // Reset question selection state
-                      setIsQuestionSelected(false);
-                    }}
+                    onClick={handleEnterBattleRoom}
                   >
                     Enter Battle Room
                   </Button>
@@ -543,7 +679,7 @@ const BattleArena: React.FC = () => {
             <div className="text-2xl font-mono font-bold text-amber-400">{timeRemaining}</div>
           </div>
           
-          {/* Players bar - moved to top */}
+          {/* Players bar */}
           <PlayersBar 
             connectedUsers={connectedUsers}
             currentUserEmail={user?.email}
@@ -553,43 +689,217 @@ const BattleArena: React.FC = () => {
             onUseSkill={useSkill}
           />
           
-          {/* Main content area with 2-column layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Left column - Question list or Problem description */}
-            <div className="flex flex-col">
-              {!isQuestionSelected ? (
-                <ProblemList 
-                  selectedTopics={selectedTopics}
-                  availableQuestions={availableQuestions}
-                  activeTopicFilter={activeTopicFilter}
-                  setActiveTopicFilter={setActiveTopicFilter}
-                  onSelectQuestion={selectQuestion}
-                  onRandomChallenge={handleRandomChallenge}
-                  getFilteredQuestions={getFilteredQuestions}
-                />
-              ) : (
-                <BattleProblemDisplay 
+          {!isQuestionSelected ? (
+            <div className="mt-4">
+              {/* Main content area with 2-column layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Left column - Problem list */}
+                <div>
+                  <ProblemList 
+                    selectedTopics={selectedTopics}
+                    availableQuestions={availableQuestions}
+                    activeTopicFilter={activeTopicFilter}
+                    setActiveTopicFilter={setActiveTopicFilter}
+                    onSelectQuestion={selectQuestion}
+                    onRandomChallenge={handleRandomChallenge}
+                    getFilteredQuestions={getFilteredQuestions}
+                    completedQuestions={user?.email && completedQuestions[user.email] ? completedQuestions[user.email] : []}
+                    currentUserEmail={user?.email}
+                  />
+                </div>
+                
+                {/* Right column - Code editor */}
+                <CodeEditor 
+                  userCode={userCode}
+                  setUserCode={setUserCode}
+                  selectedLanguage={selectedLanguage}
+                  setSelectedLanguage={setSelectedLanguage}
+                  timeRemaining={timeRemaining}
+                  editorFrozen={editorFrozen}
+                  editorFrozenEndTime={editorFrozenEndTime}
+                  isQuestionSelected={isQuestionSelected}
                   currentQuestion={currentQuestion}
-                  onBackToList={backToQuestionList}
+                  onSubmitSolution={handleSubmitSolution}
+                  setDebugMsg={setDebugMsg}
+                  onTestRun={handleTestRun}
+                  isSubmitting={isSubmitting}
                 />
-              )}
+              </div>
             </div>
-            
-            {/* Right column - Code editor */}
-            <CodeEditor 
-              userCode={userCode}
-              setUserCode={setUserCode}
-              selectedLanguage={selectedLanguage}
-              setSelectedLanguage={setSelectedLanguage}
-              timeRemaining={timeRemaining}
-              editorFrozen={editorFrozen}
-              editorFrozenEndTime={editorFrozenEndTime}
-              isQuestionSelected={isQuestionSelected}
-              currentQuestion={currentQuestion}
-              onSubmitSolution={handleSubmitSolution}
-              setDebugMsg={setDebugMsg}
-            />
-          </div>
+          ) : (
+            <div className="mt-4">
+              {/* Main Battle UI with tabs similar to Codewars */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Left column with Instructions/Output tabs */}
+                <div className="flex flex-col bg-gray-900 rounded-lg overflow-hidden">
+                  <div className="flex border-b border-gray-700">
+                    <button 
+                      className={`px-6 py-3 text-sm font-medium ${activeView === 'instructions' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'}`}
+                      onClick={() => setActiveView('instructions')}
+                    >
+                      Instructions
+                    </button>
+                    <button 
+                      className={`px-6 py-3 text-sm font-medium ${activeView === 'output' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800/50'}`}
+                      onClick={() => setActiveView('output')}
+                      disabled={!testResults && !isRunningTests}
+                    >
+                      Output
+                    </button>
+                  </div>
+                  <div className="flex-1">
+                    {activeView === 'instructions' ? (
+                      // Show problem description
+                      <div className="p-4 h-[600px] overflow-y-auto">
+                        <div className="prose prose-invert max-w-none">
+                          <h2 className="text-xl font-bold text-white mb-4">{currentQuestion?.title}</h2>
+                          <div dangerouslySetInnerHTML={{ 
+                            __html: currentQuestion?.description.replace(/\n/g, '<br>').replace(/`([^`]+)`/g, '<code>$1</code>') || ''
+                          }} />
+                        </div>
+                        
+                        {/* Examples */}
+                        {currentQuestion?.examples && currentQuestion.examples.length > 0 && (
+                          <div className="mt-4">
+                            <h3 className="text-lg font-medium text-white mb-2">Examples</h3>
+                            <div className="space-y-3">
+                              {currentQuestion.examples.map((example, index) => (
+                                <div key={index} className="bg-gray-800 p-3 rounded-md">
+                                  <pre className="text-sm text-gray-300 whitespace-pre-wrap">{example}</pre>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Constraints */}
+                        {currentQuestion?.constraints && currentQuestion.constraints.length > 0 && (
+                          <div className="mt-4">
+                            <h3 className="text-lg font-medium text-white mb-2">Constraints</h3>
+                            <ul className="list-disc pl-5 space-y-1">
+                              {currentQuestion.constraints.map((constraint, index) => (
+                                <li key={index} className="text-sm text-gray-300">{constraint}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        <div className="mt-4 text-center">
+                          <Button 
+                            variant="outline" 
+                            className="border-gray-600 text-gray-300 hover:bg-gray-700/50"
+                            onClick={backToQuestionList}
+                          >
+                            ← Back to Problem List
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      // Show test output
+                      <div className="p-4 h-[600px] overflow-y-auto">
+                        {isRunningTests ? (
+                          <div className="flex items-center justify-center h-40">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                            <span className="ml-3 text-white">Running tests...</span>
+                          </div>
+                        ) : testResults ? (
+                          <>
+                            {/* Green output box with passed tests */}
+                            <div className={`p-4 rounded ${testResults.passed === testResults.total ? 'bg-green-950/30 border-l-4 border-green-500' : 'bg-red-950/30 border-l-4 border-red-500'}`}>
+                              {/* Test summary header with time and count */}
+                              <div className="flex flex-wrap items-center justify-between text-sm mb-2">
+                                <div className="text-gray-400">Time: 456ms</div>
+                                <div>
+                                  <span className="text-green-400">Passed: {testResults.passed}</span>
+                                  <span className="mx-2 text-gray-500">|</span>
+                                  <span className="text-red-400">Failed: {testResults.total - testResults.passed}</span>
+                                </div>
+                              </div>
+                              
+                              {/* Test Results section */}
+                              <div className="mt-4">
+                                <h3 className="text-lg font-medium text-white mb-2">Test Results:</h3>
+                                
+                                {/* Display test cases */}
+                                <div className="space-y-px border border-gray-700 rounded-md overflow-hidden bg-gray-800">
+                                  {testResults.passed === testResults.total ? (
+                                    <div className="py-4 text-center text-green-400 font-medium">
+                                      You have passed all of the tests! :)
+                                    </div>
+                                  ) : (
+                                    // Map failed test cases
+                                    testResults.failedTests?.map((test, idx) => (
+                                      <TestResultItem 
+                                        key={idx} 
+                                        index={test.index} 
+                                        input={test.input} 
+                                        expected={test.expected} 
+                                        actual={test.actual}
+                                        passed={false}
+                                      />
+                                    ))
+                                  )}
+                                  
+                                  {/* Show passed test indexes if any */}
+                                  {testResults.passed > 0 && Array.from({ length: testResults.passed }).map((_, idx) => {
+                                    // Calculate the index for passed tests
+                                    // This is a simplification - ideally we would know which tests passed
+                                    const testIndex = (testResults.failedTests?.length || 0) > 0 
+                                      ? `[-${idx + 1}]` // Just assign some placeholder index
+                                      : `Test #${idx + 1}`;
+                                    
+                                    return (
+                                      <TestResultItem 
+                                        key={`passed-${idx}`} 
+                                        index={testIndex}
+                                        passed={true}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="mt-4 text-center">
+                              <Button 
+                                variant="outline" 
+                                className="border-gray-600 text-gray-300 hover:bg-gray-700/50"
+                                onClick={() => setActiveView('instructions')}
+                              >
+                                Back to Instructions
+                              </Button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+                            <p>No test results yet</p>
+                            <p className="text-sm mt-2">Run tests to see results here</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Right column - Code editor (always visible) */}
+                <CodeEditor 
+                  userCode={userCode}
+                  setUserCode={setUserCode}
+                  selectedLanguage={selectedLanguage}
+                  setSelectedLanguage={setSelectedLanguage}
+                  timeRemaining={timeRemaining}
+                  editorFrozen={editorFrozen}
+                  editorFrozenEndTime={editorFrozenEndTime}
+                  isQuestionSelected={isQuestionSelected}
+                  currentQuestion={currentQuestion}
+                  onSubmitSolution={handleSubmitSolution}
+                  setDebugMsg={setDebugMsg}
+                  onTestRun={handleTestRun}
+                  isSubmitting={isSubmitting}
+                />
+              </div>
+            </div>
+          )}
           
           {/* Scoreboard and notifications */}
           <Scoreboard 
@@ -842,6 +1152,7 @@ const BattleArena: React.FC = () => {
         },
         (payload) => {
           console.log('Battle session updated:', payload);
+          
           // Update connected users
           if (payload.new && payload.new.connected_emails) {
             const connectedEmails = Array.isArray(payload.new.connected_emails) 
@@ -851,6 +1162,16 @@ const BattleArena: React.FC = () => {
             console.log('Updating connected users from real-time:', connectedEmails);
             setConnectedUsers(connectedEmails);
             setPlayerCount(connectedEmails.length);
+            
+            // Also update ready users to ensure they're still connected
+            if (payload.new.ready_users) {
+              const readyUsersList = Array.isArray(payload.new.ready_users)
+                ? payload.new.ready_users
+                : [];
+                
+              console.log('Updating ready users from real-time:', readyUsersList);
+              setReadyUsers(readyUsersList);
+            }
           }
           
           // Update ready users if available
@@ -874,6 +1195,210 @@ const BattleArena: React.FC = () => {
     };
   }, [user?.email]);
 
+  // Subscribe to battle state changes
+  useEffect(() => {
+    if (!user?.email) return;
+
+    console.log('Setting up battle state subscription');
+    
+    const battleStateChannel = supabase
+      .channel('battle_state_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'battle_sessions',
+          filter: `id=eq.default-battle-session`
+        },
+        async (payload) => {
+          console.log('Received battle state update:', payload);
+          if (payload.new) {
+            const newBattleState = payload.new.battle_state;
+            const readyUsersList = Array.isArray(payload.new.ready_users) ? payload.new.ready_users : [];
+            const connectedEmailsList = Array.isArray(payload.new.connected_emails) ? payload.new.connected_emails : [];
+            
+            console.log('Battle state update:', {
+              newBattleState,
+              readyUsers: readyUsersList,
+              connectedUsers: connectedEmailsList
+            });
+            
+            if (newBattleState === 'battle_room' || 
+               (readyUsersList.length === connectedEmailsList.length && connectedEmailsList.length > 1)) {
+              console.log('Transitioning to battle room');
+              setDebugMsg('Battle is starting...');
+              
+              // Update local state
+              setBattleState('battle_room');
+              
+              try {
+                // Load questions
+                await loadQuestionsForSelectedTopics(selectedTopics);
+                setIsQuestionSelected(false);
+                setDebugMsg('Successfully entered battle room!');
+              } catch (err) {
+                console.error('Error loading questions:', err);
+                setDebugMsg('Entered battle room but had trouble loading questions.');
+              }
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Battle state subscription status:', status);
+      });
+
+    return () => {
+      console.log('Cleaning up battle state subscription');
+      battleStateChannel.unsubscribe();
+    };
+  }, [user?.email, selectedTopics]);
+
+  // Add battle_state column if it doesn't exist
+  useEffect(() => {
+    if (!user?.email) return;
+    
+    const updateSchema = async () => {
+      try {
+        const { data: schemaCheck } = await supabase.rpc('execute_sql', {
+          sql_query: `
+            DO $$
+            BEGIN
+              -- Add battle_state column if it doesn't exist
+              IF NOT EXISTS (
+                SELECT FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                AND table_name = 'battle_sessions' 
+                AND column_name = 'battle_state'
+              ) THEN
+                ALTER TABLE public.battle_sessions ADD COLUMN battle_state TEXT DEFAULT 'topic_selection';
+              END IF;
+
+              -- Add last_state_change column if it doesn't exist
+              IF NOT EXISTS (
+                SELECT FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                AND table_name = 'battle_sessions' 
+                AND column_name = 'last_state_change'
+              ) THEN
+                ALTER TABLE public.battle_sessions ADD COLUMN last_state_change TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+              END IF;
+
+              -- Add state_changed_by column if it doesn't exist
+              IF NOT EXISTS (
+                SELECT FROM information_schema.columns 
+                WHERE table_schema = 'public' 
+                AND table_name = 'battle_sessions' 
+                AND column_name = 'state_changed_by'
+              ) THEN
+                ALTER TABLE public.battle_sessions ADD COLUMN state_changed_by TEXT;
+              END IF;
+            END
+            $$;
+          `
+        });
+        console.log('Schema update completed:', schemaCheck);
+
+      } catch (error) {
+        console.error('Error updating schema:', error);
+      }
+    };
+    
+    updateSchema();
+  }, [user?.email]);
+
+  // Add a listener for completed questions updates
+  useEffect(() => {
+    if (!user?.email) return;
+    
+    console.log('Setting up completed questions listener');
+    
+    const completedChannel = supabase.channel('completed_questions_listener', {
+      config: {
+        broadcast: { self: true } // Receive our own broadcasts too
+      }
+    });
+    
+    completedChannel
+      .on('broadcast', { event: 'question_completed' }, (payload) => {
+        console.log('Received completed question update:', payload);
+        if (payload.payload?.completedQuestions) {
+          setCompletedQuestions(payload.payload.completedQuestions);
+        }
+      })
+      .subscribe((status) => {
+        console.log('Completed questions listener channel status:', status);
+      });
+      
+    return () => {
+      console.log('Unsubscribing from completed questions updates');
+      completedChannel.unsubscribe();
+    };
+  }, [user?.email]);
+
+  const handleEnterBattleRoom = async () => {
+    try {
+      setDebugMsg('Transitioning to battle room...');
+      
+      // Get current session state first
+      const { data: currentSession } = await supabase
+        .from('battle_sessions')
+        .select('ready_users, connected_emails')
+        .eq('id', 'default-battle-session')
+        .single();
+
+      if (!currentSession) {
+        setDebugMsg('Error: Could not find battle session');
+        return;
+      }
+
+      const connectedEmails = Array.isArray(currentSession.connected_emails) 
+        ? currentSession.connected_emails 
+        : [];
+      const readyUsers = Array.isArray(currentSession.ready_users) 
+        ? currentSession.ready_users 
+        : [];
+
+      // Verify all users are still ready
+      if (readyUsers.length !== connectedEmails.length || connectedEmails.length < 2) {
+        setDebugMsg('Error: Not all users are ready');
+        return;
+      }
+
+      // Update battle state in database
+      const { error: updateError } = await supabase
+        .from('battle_sessions')
+        .update({ 
+          battle_state: 'battle_room',
+          updated_at: new Date().toISOString(),
+          last_state_change: new Date().toISOString(),
+          state_changed_by: user?.email
+        })
+        .eq('id', 'default-battle-session');
+        
+      if (updateError) {
+        console.error('Error updating battle state:', updateError);
+        setDebugMsg('Error starting battle: ' + updateError.message);
+        return;
+      }
+
+      // Update local state immediately
+      setBattleState('battle_room');
+      
+      // Load questions from selected topics immediately
+      await loadQuestionsForSelectedTopics(selectedTopics);
+      
+      // Reset question selection state
+      setIsQuestionSelected(false);
+      
+      setDebugMsg('Successfully entered battle room!');
+    } catch (err) {
+      console.error('Error transitioning to battle room:', err);
+      setDebugMsg('Error entering battle room. Please try again.');
+    }
+  };
+
   // Main render
   return (
     <DndProvider backend={HTML5Backend}>
@@ -887,6 +1412,9 @@ const BattleArena: React.FC = () => {
           setSelectedTopics={setSelectedTopics}
         />
         
+        {/* Celebration animation */}
+        <Confetti active={showConfetti} />
+        
         {/* Add the FloatingCodeBackground component */}
         <FloatingCodeBackground 
           excludedTopics={battleState === 'battle_room' && currentQuestion ? [currentQuestion.category] : []} 
@@ -895,8 +1423,8 @@ const BattleArena: React.FC = () => {
         
         <Card className={`p-8 bg-gray-900 border-gray-800 w-full text-center 
           ${battleState === 'battle_room' ? 'max-w-6xl' : 'max-w-4xl'}`}>
-          <div className="w-24 h-24 mx-auto mb-4">
-            <Logo className="h-24" />
+          <div className="w-42 h-42 mx-auto mb-6">
+            <Logo className="h-32" />
           </div>
           
           {/* Content based on battle state */}

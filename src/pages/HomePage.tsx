@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Logo from "@/components/Logo";
-import { codeSnippets } from '../data/codeSnippets';
+import FloatingCodeBackground from '@/components/FloatingCodeBackground';
 import { useAuth } from '../contexts/AuthContext';
 
 // RPG-themed battle categories
@@ -39,12 +39,18 @@ const HomePage = () => {
   const { user, signIn, signOut } = useAuth();
   
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white relative overflow-hidden">
-      {/* Simple header to show email when logged in */}
+    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 relative">
+      {/* Floating Code Background */}
+      <FloatingCodeBackground opacity={0.2} />
+
+      {/* Magical Aura */}
+      <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 animate-pulse" />
+
+      {/* Header */}
       {user && (
-        <header className="w-full bg-gray-900/80 backdrop-blur-sm border-b border-gray-800 py-3 px-4">
+        <header className="w-full bg-gray-900/80 backdrop-blur-sm border-b border-gray-800 py-3 px-4 relative z-[100]">
           <div className="max-w-6xl mx-auto flex items-center justify-between">
-            <div className="h-10 w-10" onClick={() => navigate('/')}>
+            <div className="h-10 w-10 cursor-pointer" onClick={() => navigate('/')}>
               <Logo />
             </div>
             <div className="flex items-center">
@@ -62,34 +68,8 @@ const HomePage = () => {
         </header>
       )}
 
-      {/* Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        {/* Floating Code Snippets */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {codeSnippets.map((snippet, index) => (
-            <div
-              key={index}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2 opacity-20 hover:opacity-40 transition-opacity duration-300"
-              style={{
-                top: snippet.top,
-                left: snippet.left,
-                animation: `float ${10 + index}s infinite ease-in-out`,
-                animationDelay: snippet.delay
-              }}
-            >
-              <pre className="text-xs font-mono bg-gray-900/50 p-2 rounded-lg backdrop-blur-sm">
-                <code>{snippet.code}</code>
-              </pre>
-            </div>
-          ))}
-        </div>
-
-        {/* Magical Aura */}
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-blue-500/10 animate-pulse" />
-      </div>
-
       {/* Main Content */}
-      <div className="relative z-10 max-w-6xl mx-auto px-4 py-12">
+      <div className="relative z-[100] max-w-6xl mx-auto px-4 py-12">
         <Logo />
         
         {/* Epic title with fantasy styling */}

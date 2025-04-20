@@ -37,7 +37,7 @@ export type SetupStatus = 'unknown' | 'checking' | 'not_setup' | 'setting_up' | 
 export type BattleState = 'lobby' | 'topic_selection' | 'battle_room';
 
 // Define language extensions
-export const DEFAULT_AVATAR = "https://api.dicebear.com/7.x/bottts/svg";
+export const DEFAULT_AVATAR = "https://api.dicebear.com/7.x/pixel-art-neutral/svg";
 
 // Skill gibberish options for chaos effect
 export const CODE_GIBBERISH = [

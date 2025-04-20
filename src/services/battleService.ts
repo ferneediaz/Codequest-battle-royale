@@ -5,6 +5,12 @@ import type { BattleSession } from '../lib/supabase-types';
 // In a more complex app, you might create multiple battle sessions
 const DEFAULT_BATTLE_SESSION_ID = 'default-battle-session';
 
+// Helper function to normalize email for comparison
+const normalizeEmail = (email: string): string => {
+  const [localPart] = email.split('@');
+  return localPart.toLowerCase();
+};
+
 export const battleService = {
   // Join a battle session
   async joinBattle(userEmail?: string): Promise<BattleSession | null> {
@@ -12,29 +18,22 @@ export const battleService = {
       console.log('Attempting to join battle session with email:', userEmail);
       
       if (!userEmail) {
-        console.warn('No user email provided, this may cause tracking issues');
+        console.warn('No user email provided');
+        return null;
       }
-      
-      // First check if the default session exists
+
+      // Get existing session
       const { data: existingSession, error: fetchError } = await supabase
         .from('battle_sessions')
         .select('*')
         .eq('id', DEFAULT_BATTLE_SESSION_ID)
         .single();
-      
-      if (fetchError) {
-        console.log('Session not found or error fetching:', fetchError.message);
-        
-        // We need to check if it's a "not found" error or a different kind of error
-        if (fetchError.code === 'PGRST116') {
-          console.log('Session not found, will create a new one');
-        } else {
-          // If it's a different error, throw it
-          console.error('Error fetching session:', fetchError);
-          throw new Error(`Database error: ${fetchError.message}`);
-        }
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching session:', fetchError.message);
+        throw new Error(`Error fetching session: ${fetchError.message}`);
       }
-      
+
       if (existingSession) {
         console.log('Found existing session with data:', existingSession);
         
@@ -42,22 +41,24 @@ export const battleService = {
         let connectedEmails = Array.isArray(existingSession.connected_emails) 
           ? existingSession.connected_emails 
           : [];
+
+        // Remove any stale entries of this user
+        connectedEmails = connectedEmails.filter((email: string) => 
+          normalizeEmail(email) !== normalizeEmail(userEmail)
+        );
+
+        // Add the new user email
+        connectedEmails.push(userEmail);
+        console.log('Current connected users:', connectedEmails);
         
-        // Only add the email if it's valid and not already in the list
-        if (userEmail && !connectedEmails.includes(userEmail)) {
-          connectedEmails.push(userEmail);
-          console.log('Adding email to connected list:', userEmail);
-        }
-        
-        // Always set active_users to match the email list length for consistency
-        // This ensures the count matches the actual connected users
-        const newCount = connectedEmails.length;
-        
+        // Update session - IMPORTANT: Only update the connected_emails
+        // Do NOT update ready_users to prevent resetting ready status
         const { data: updatedSession, error: updateError } = await supabase
           .from('battle_sessions')
           .update({ 
-            active_users: newCount,
+            active_users: connectedEmails.length,
             connected_emails: connectedEmails
+            // Do not modify ready_users here
           })
           .eq('id', DEFAULT_BATTLE_SESSION_ID)
           .select()
@@ -70,35 +71,36 @@ export const battleService = {
         
         console.log('Updated session:', updatedSession);
         return updatedSession;
-      } else {
-        console.log('Creating new session...');
-        // Create a new battle session if it doesn't exist
-        const initialEmails = userEmail ? [userEmail] : [];
-        const { data: newSession, error: insertError } = await supabase
-          .from('battle_sessions')
-          .insert({
-            id: DEFAULT_BATTLE_SESSION_ID,
-            active_users: initialEmails.length,
-            is_active: false,
-            round: 1,
-            time_remaining: 300,
-            current_category: 'Binary Search Castle',
-            connected_emails: initialEmails
-          })
-          .select()
-          .single();
-          
-        if (insertError) {
-          console.error('Error creating session:', insertError.message);
-          throw new Error(`Error creating session: ${insertError.message}`);
-        }
-        
-        console.log('Created new session:', newSession);
-        return newSession;
       }
+
+      // Create new session if it doesn't exist
+      console.log('Creating new session...');
+      const initialEmails = [userEmail];
+      
+      const { data: newSession, error: insertError } = await supabase
+        .from('battle_sessions')
+        .insert({
+          id: DEFAULT_BATTLE_SESSION_ID,
+          active_users: 1,
+          is_active: false,
+          round: 1,
+          time_remaining: 300,
+          current_category: 'Binary Search Castle',
+          connected_emails: initialEmails
+        })
+        .select()
+        .single();
+        
+      if (insertError) {
+        console.error('Error creating session:', insertError.message);
+        throw new Error(`Error creating session: ${insertError.message}`);
+      }
+      
+      console.log('Created new session:', newSession);
+      return newSession;
     } catch (error) {
       console.error('Error joining battle:', error);
-      throw error; // Re-throw to allow proper error handling in the UI
+      throw error;
     }
   },
 
@@ -243,19 +245,21 @@ export const battleService = {
           table: 'battle_sessions',
           filter: `id=eq.${DEFAULT_BATTLE_SESSION_ID}`
         },
-        (payload) => {
+        async (payload) => {
           console.log('Received battle session realtime update:', payload);
           
-          // Log detailed information about connected users
-          if (payload.new && payload.new.connected_emails) {
-            const emails = Array.isArray(payload.new.connected_emails) 
-              ? payload.new.connected_emails 
-              : [];
-            console.log(`Connected users in database: ${emails.length}`, emails);
-          }
+          // Get fresh data from the database to ensure we have the latest state
+          const { data: freshSession } = await supabase
+            .from('battle_sessions')
+            .select('*')
+            .eq('id', DEFAULT_BATTLE_SESSION_ID)
+            .single();
           
-          // The payload.new contains the updated battle session
-          if (payload.new) {
+          if (freshSession) {
+            console.log('Fresh session data:', freshSession);
+            callback(freshSession as BattleSession);
+          } else if (payload.new) {
+            // Fallback to payload data if fresh fetch fails
             callback(payload.new as BattleSession);
           }
         }

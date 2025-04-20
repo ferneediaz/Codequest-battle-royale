@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
@@ -6,6 +6,17 @@ import { formatTime, getFreezeRemainingTime } from '../../utils/battleUtils';
 import { Button } from "@/components/ui/button";
 import { CodeProblem } from '../../services/problemService';
 import { submissionService } from '../../services/submissionService';
+
+export interface TestResults {
+  passed: number;
+  total: number;
+  failedTests?: Array<{
+    input: string;
+    expected: string;
+    actual: string;
+    index: number;
+  }>;
+}
 
 interface CodeEditorProps {
   userCode: string;
@@ -19,6 +30,8 @@ interface CodeEditorProps {
   currentQuestion: CodeProblem | null;
   onSubmitSolution: () => void;
   setDebugMsg: (msg: string) => void;
+  onTestRun: (results: TestResults | null, isRunning: boolean) => void;
+  isSubmitting?: boolean;
 }
 
 const CodeEditor: React.FC<CodeEditorProps> = ({
@@ -32,8 +45,46 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   isQuestionSelected,
   currentQuestion,
   onSubmitSolution,
-  setDebugMsg
+  setDebugMsg,
+  onTestRun,
+  isSubmitting = false
 }) => {
+  const [isRunningTests, setIsRunningTests] = useState(false);
+
+  // Run test cases
+  const runTestCases = async () => {
+    if (!currentQuestion) return;
+    
+    setIsRunningTests(true);
+    onTestRun(null, true); // Signal that tests are running
+    
+    try {
+      const visibleTests = currentQuestion.testCases.filter(test => !test.isHidden);
+      
+      const results = await submissionService.runTestCases(
+        userCode, 
+        selectedLanguage,
+        visibleTests
+      );
+      
+      console.log('Test results:', results);
+      const testResults: TestResults = {
+        passed: results.passed,
+        total: results.total,
+        failedTests: results.failedTests
+      };
+      
+      onTestRun(testResults, false); // Pass results to parent
+      setDebugMsg(`${results.passed}/${results.total} tests passed`);
+    } catch (error) {
+      console.error('Error running tests:', error);
+      setDebugMsg('Error running tests');
+      onTestRun(null, false); // Clear test running state
+    } finally {
+      setIsRunningTests(false);
+    }
+  };
+
   return (
     <div className="flex flex-col">
       <div className="bg-gray-800 px-4 py-2 text-gray-300 text-sm flex justify-between items-center rounded-t-lg">
@@ -90,40 +141,43 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
         </div>
       </div>
       
-      <div className="bg-gray-800 p-3 flex justify-between rounded-b-lg">
+      <div className="bg-gray-800 p-3 flex flex-col gap-3 rounded-b-lg">
         <div className="flex gap-2">
           <Button
             variant="outline"
             className="border-green-700/50 text-white hover:bg-green-800/30"
-            disabled={editorFrozen || !isQuestionSelected}
-            onClick={() => {
-              // Run test cases
-              if (currentQuestion) {
-                const visibleTests = currentQuestion.testCases.filter(test => !test.isHidden);
-                submissionService.runTestCases(
-                  userCode, 
-                  selectedLanguage,
-                  visibleTests
-                ).then(results => {
-                  console.log('Test results:', results);
-                  setDebugMsg(`${results.passed}/${results.total} tests passed`);
-                }).catch(error => {
-                  console.error('Error running tests:', error);
-                  setDebugMsg('Error running tests');
-                });
-              }
-            }}
+            disabled={editorFrozen || !isQuestionSelected || isRunningTests}
+            onClick={runTestCases}
           >
-            Run Tests
+            {isRunningTests ? (
+              <div className="flex items-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Running...
+              </div>
+            ) : (
+              'Run Tests'
+            )}
+          </Button>
+          
+          <Button
+            className={`relative overflow-hidden ${isSubmitting ? 'bg-indigo-800' : 'bg-indigo-700 hover:bg-indigo-800'} text-white`}
+            disabled={editorFrozen || !isQuestionSelected || isSubmitting}
+            onClick={onSubmitSolution}
+          >
+            <div className="flex items-center">
+              {isSubmitting && (
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              )}
+              {isSubmitting ? 'Submitting...' : 'Submit Solution'}
+            </div>
           </Button>
         </div>
-        <Button
-          className="bg-indigo-700 hover:bg-indigo-800 text-white"
-          disabled={editorFrozen || !isQuestionSelected}
-          onClick={onSubmitSolution}
-        >
-          Submit Solution
-        </Button>
       </div>
     </div>
   );

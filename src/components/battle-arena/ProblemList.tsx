@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { BattleCategory, CATEGORY_EMOJIS } from '../../constants/battleConstants';
 import { CodeProblem } from '../../services/problemService';
+import { CheckCircle } from 'lucide-react';
 
 interface ProblemListProps {
   selectedTopics: BattleCategory[];
@@ -13,6 +14,8 @@ interface ProblemListProps {
   onSelectQuestion: (problem: CodeProblem) => void;
   onRandomChallenge: () => void;
   getFilteredQuestions: () => CodeProblem[];
+  completedQuestions?: string[];
+  currentUserEmail?: string;
 }
 
 const ProblemList: React.FC<ProblemListProps> = ({
@@ -22,8 +25,14 @@ const ProblemList: React.FC<ProblemListProps> = ({
   setActiveTopicFilter,
   onSelectQuestion,
   onRandomChallenge,
-  getFilteredQuestions
+  getFilteredQuestions,
+  completedQuestions = [],
+  currentUserEmail
 }) => {
+  const isQuestionCompleted = (questionId: string) => {
+    return completedQuestions.includes(questionId);
+  };
+
   return (
     <Card className="bg-gray-800 p-4 overflow-y-auto h-[600px]">
       <div className="flex justify-between items-center mb-4">
@@ -69,30 +78,46 @@ const ProblemList: React.FC<ProblemListProps> = ({
       {/* Questions list */}
       <div className="space-y-3">
         {availableQuestions.length > 0 ? (
-          getFilteredQuestions().map((question, index) => (
-            <div 
-              key={index}
-              className="bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-indigo-500 rounded-lg p-3 cursor-pointer transition-colors"
-              onClick={() => onSelectQuestion(question)}
-            >
-              <div className="flex justify-between items-center mb-1">
-                <h3 className="text-base font-medium text-white">{question.title}</h3>
-                <Badge className={
-                  question.difficulty === 'easy' ? 'bg-green-600' : 
-                  question.difficulty === 'medium' ? 'bg-yellow-600' : 
-                  'bg-red-600'
-                }>
-                  {question.difficulty.toUpperCase()}
-                </Badge>
+          getFilteredQuestions().map((question, index) => {
+            const completed = isQuestionCompleted(question.id);
+            
+            return (
+              <div 
+                key={index}
+                className={`bg-gray-800 border border-gray-700 rounded-lg p-3 transition-colors ${
+                  completed 
+                    ? 'border-green-600 bg-green-900/20' 
+                    : 'hover:bg-gray-700 hover:border-indigo-500 cursor-pointer'
+                }`}
+                onClick={() => !completed && onSelectQuestion(question)}
+              >
+                <div className="flex justify-between items-center mb-1">
+                  <div className="flex items-center">
+                    <h3 className="text-base font-medium text-white">{question.title}</h3>
+                    {completed && (
+                      <div className="ml-2 flex items-center text-green-500">
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        <span className="text-xs">Completed</span>
+                      </div>
+                    )}
+                  </div>
+                  <Badge className={
+                    question.difficulty === 'easy' ? 'bg-green-600' : 
+                    question.difficulty === 'medium' ? 'bg-yellow-600' : 
+                    'bg-red-600'
+                  }>
+                    {question.difficulty.toUpperCase()}
+                  </Badge>
+                </div>
+                <p className={`text-xs ${completed ? 'text-gray-400' : 'text-gray-300'} line-clamp-2`}>
+                  {question.description.replace(/<[^>]*>/g, ' ')}
+                </p>
+                <div className="mt-2 text-xs text-gray-400">
+                  Category: {question.category}
+                </div>
               </div>
-              <p className="text-xs text-gray-300 line-clamp-2">
-                {question.description.replace(/<[^>]*>/g, ' ')}
-              </p>
-              <div className="mt-2 text-xs text-gray-400">
-                Category: {question.category}
-              </div>
-            </div>
-          ))
+            );
+          })
         ) :
           <div className="text-center py-8">
             <div className="text-3xl mb-3">🔍</div>
