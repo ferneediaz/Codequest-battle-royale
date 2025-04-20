@@ -98,6 +98,9 @@ export const useQuestionLoader = () => {
   
   // Select a specific question
   const selectQuestion = useCallback((problem: CodeProblem) => {
+    console.log('[useQuestionLoader] Selecting question:', problem.id);
+    console.log('[useQuestionLoader] Test Cases for selected question:', JSON.stringify(problem.testCases));
+    
     setCurrentQuestion(problem);
     setIsQuestionSelected(true);
     return problem;

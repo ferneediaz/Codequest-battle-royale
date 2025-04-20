@@ -58,6 +58,11 @@ class ProblemService {
       
       if (error) {
         console.error('Error fetching problems from Supabase:', error);
+      } else if (supabaseProblems) {
+        // Add detailed logging for fetched test cases
+        supabaseProblems.forEach(problem => {
+          console.log(`Problem ID: ${problem.id}, Fetched Test Cases:`, JSON.stringify(problem.testCases));
+        });
       }
       
       if (supabaseProblems && supabaseProblems.length > 0) {

@@ -5,17 +5,20 @@ import { python } from '@codemirror/lang-python';
 import { formatTime, getFreezeRemainingTime } from '../../utils/battleUtils';
 import { Button } from "@/components/ui/button";
 import { CodeProblem } from '../../services/problemService';
-import { submissionService } from '../../services/submissionService';
+import { submissionService, LANGUAGE_IDS, JudgeResult, JUDGE_STATUS } from '../../services/submissionService';
+
+export interface TestResultItemDetails {
+  input: string;
+  expected: string;
+  actual: string;
+  index: number;
+}
 
 export interface TestResults {
   passed: number;
   total: number;
-  failedTests?: Array<{
-    input: string;
-    expected: string;
-    actual: string;
-    index: number;
-  }>;
+  failedTests?: TestResultItemDetails[];
+  passedTests?: TestResultItemDetails[];
 }
 
 interface CodeEditorProps {
@@ -52,33 +55,95 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   const [isRunningTests, setIsRunningTests] = useState(false);
 
   // Run test cases
-  const runTestCases = async () => {
+    const runTestCases = async () => {
     if (!currentQuestion) return;
     
     setIsRunningTests(true);
     onTestRun(null, true); // Signal that tests are running
+    setDebugMsg('Running tests...');
     
     try {
       const visibleTests = currentQuestion.testCases.filter(test => !test.isHidden);
       
-      const results = await submissionService.runTestCases(
-        userCode, 
-        selectedLanguage,
-        visibleTests
-      );
-      
-      console.log('Test results:', results);
-      const testResults: TestResults = {
-        passed: results.passed,
-        total: results.total,
-        failedTests: results.failedTests
+      // Prepare submission for Judge0
+      const languageId = LANGUAGE_IDS[selectedLanguage as keyof typeof LANGUAGE_IDS];
+      if (!languageId) {
+        throw new Error(`Unsupported language: ${selectedLanguage}`);
+      }
+
+      // Ensure test cases have the correct expected field for the test runner
+      const formattedTestCases = visibleTests.map(test => ({
+        input: test.input,
+        expected: test.output // Map the output field to expected
+      }));
+
+      console.log('Run Tests - using visibleTests:', formattedTestCases);
+
+      const submissionPayload = {
+        source_code: userCode,
+        language_id: languageId,
+        stdin: JSON.stringify({ testCases: formattedTestCases }), // Pass tests via stdin
       };
+
+      // Use submitCode which runs the embedded test runner
+      const result: JudgeResult = await submissionService.submitCode(submissionPayload);
       
-      onTestRun(testResults, false); // Pass results to parent
-      setDebugMsg(`${results.passed}/${results.total} tests passed`);
+      let testResults: TestResults | null = null;
+      
+      // Check Judge0 status first
+      if (result.status.id === JUDGE_STATUS.ACCEPTED) {
+        // If accepted, parse the stdout which contains our test runner JSON output
+        if (result.stdout) {
+          try {
+            const runnerOutput = JSON.parse(result.stdout);
+            if (runnerOutput.summary && runnerOutput.results) {
+              // Separate passed and failed tests from runner output
+              const failed = runnerOutput.results
+                .filter((r: any) => !r.passed)
+                .map((r: any, index: number): TestResultItemDetails => ({ 
+                  input: r.input,
+                  expected: r.expected,
+                  actual: r.output,
+                  index: index + 1 // Use 1-based index for display
+                }));
+                
+              const passed = runnerOutput.results
+                .filter((r: any) => r.passed)
+                .map((r: any, index: number): TestResultItemDetails => ({ 
+                  input: r.input, 
+                  expected: r.expected, 
+                  actual: r.output, 
+                  // Assign a temporary index or find a way to get the original index if needed
+                  index: index + 1 // Use 1-based index for display (adjust if original index available)
+                }));
+
+              testResults = {
+                passed: runnerOutput.summary.passed,
+                total: runnerOutput.summary.total,
+                failedTests: failed,
+                passedTests: passed // Include passed tests details
+              };
+              setDebugMsg(`${testResults.passed}/${testResults.total} tests passed`);
+            } else {
+              throw new Error('Test runner output format invalid');
+            }
+          } catch (parseError) {
+            console.error('Error parsing test runner output:', parseError, result.stdout);
+            setDebugMsg('Error processing test results.');
+          }
+        } else {
+          setDebugMsg('Tests ran, but no output received.');
+        }
+      } else {
+        // Handle other Judge0 statuses (Compile Error, Runtime Error, etc.)
+        setDebugMsg(`Test Execution Failed: ${result.status.description}. ${result.stderr || result.compile_output || result.message || ''}`);
+      }
+      
+      onTestRun(testResults, false); // Pass processed results (or null if error) to parent
+      
     } catch (error) {
       console.error('Error running tests:', error);
-      setDebugMsg('Error running tests');
+      setDebugMsg(`Error running tests: ${error instanceof Error ? error.message : 'Unknown error'}`);
       onTestRun(null, false); // Clear test running state
     } finally {
       setIsRunningTests(false);

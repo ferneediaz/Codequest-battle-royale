@@ -9,7 +9,7 @@ import { battleService } from '../services/battleService';
 import { BattleSession } from '../lib/supabase-types';
 import { supabase } from '../lib/supabase';
 import { setupBattleSessionsTable, checkTableExists } from '../lib/setupDatabase';
-import { submissionService } from '../services/submissionService';
+import { submissionService, LANGUAGE_IDS, JudgeResult, JUDGE_STATUS } from '../services/submissionService';
 import { problemService, CodeProblem } from '../services/problemService';
 import FloatingCodeBackground from '../components/FloatingCodeBackground';
 import { DndProvider } from 'react-dnd';
@@ -50,6 +50,9 @@ import { getAvatarUrl } from '../utils/battleUtils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
+// Import shared types
+import { TestResultItemDetails, TestResults } from '../components/battle-arena/CodeEditor';
+
 // Extend window interface for global access
 declare global {
   interface Window {
@@ -88,26 +91,33 @@ const TestResultItem = ({
           }
         </div>
         <div className={`font-mono ${passed ? 'text-green-400' : 'text-red-400'} flex-1`}>
-          {passed ? '✓' : '✗'} {index} ({assertions} of {assertions} Assertions)
+          {passed ? '✓' : '✗'} Test {index}
         </div>
       </div>
       
-      {isExpanded && input && expected && (
+      {isExpanded && (
         <div className="pl-6 mt-2 space-y-2 text-sm">
-          <div>
-            <div className="text-gray-400 mb-1">Input:</div>
-            <div className="text-white bg-gray-900 p-2 rounded font-mono overflow-x-auto whitespace-pre">{input}</div>
-          </div>
-          
-          <div>
-            <div className="text-gray-400 mb-1">Expected:</div>
-            <div className="text-green-400 bg-gray-900 p-2 rounded font-mono overflow-x-auto whitespace-pre">{expected}</div>
-          </div>
-          
-          {!passed && actual && (
-            <div>
-              <div className="text-gray-400 mb-1">Your Output:</div>
-              <div className="text-red-400 bg-gray-900 p-2 rounded font-mono overflow-x-auto whitespace-pre">{actual}</div>
+          {(input !== undefined && expected !== undefined) ? (
+            <>
+              <div>
+                <div className="text-gray-400 mb-1">Input:</div>
+                <div className="text-white bg-gray-900 p-2 rounded font-mono overflow-x-auto whitespace-pre">{input}</div>
+              </div>
+              
+              <div>
+                <div className="text-gray-400 mb-1">Expected Result:</div>
+                <div className="text-green-400 bg-gray-900 p-2 rounded font-mono overflow-x-auto whitespace-pre">{expected}</div>
+              </div>
+              
+              {/* Always show Your Output section, regardless of pass/fail status */}
+              <div>
+                <div className="text-gray-400 mb-1">Your Code Output:</div>
+                <div className={`${passed ? 'text-green-400' : 'text-red-400'} bg-gray-900 p-2 rounded font-mono overflow-x-auto whitespace-pre`}>{actual || "undefined"}</div>
+              </div>
+            </>
+          ) : (
+            <div className="text-gray-400 italic">
+              Test details not available for this test case.
             </div>
           )}
         </div>
@@ -233,17 +243,16 @@ function merge(nums1, m, nums2, n) {
     backToQuestionList
   } = useQuestionLoader();
 
-  // Add state for test results
-  const [testResults, setTestResults] = useState<{
-    passed: number; 
-    total: number;
-    failedTests?: Array<{
-      input: string;
-      expected: string;
-      actual: string;
-      index: number;
-    }>
-  } | null>(null);
+  // Update code when the selected problem changes
+  useEffect(() => {
+    if (currentQuestion && currentQuestion.starterCode && currentQuestion.starterCode[selectedLanguage]) {
+      // Set the starter code for the currently selected problem and language
+      setUserCode(currentQuestion.starterCode[selectedLanguage]);
+    }
+  }, [currentQuestion, selectedLanguage]);
+
+  // Update state for test results to use the imported type
+  const [testResults, setTestResults] = useState<TestResults | null>(null);
   const [isRunningTests, setIsRunningTests] = useState(false);
 
   // Add state for active tab
@@ -431,7 +440,7 @@ function merge(nums1, m, nums2, n) {
     }
   };
 
-  // Handle test results from code editor
+  // Update handleTestRun to use the loading state
   const handleTestRun = (results: any, isRunning: boolean) => {
     setTestResults(results);
     setIsRunningTests(isRunning);
@@ -439,120 +448,225 @@ function merge(nums1, m, nums2, n) {
     // Automatically switch to output tab when test results are available
     if (results && !isRunning) {
       setActiveView('output');
+      
+      // Add debug info if tests are failing
+      if (results.failed > 0 && results.failedTests) {
+        console.log("Debug info for failed tests:");
+        results.failedTests.forEach((test: any) => {
+          console.log(`Test input: "${test.input}"`);
+          console.log(`Expected: ${test.expected}`);
+          console.log(`Actual: ${test.actual}`);
+          
+          // For palindrome problem - debug the algorithm
+          if (currentQuestion?.id === 'valid-palindrome') {
+            const cleanInput = test.input.replace(/^"|"$/g, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+            const reversed = cleanInput.split('').reverse().join('');
+            console.log(`Cleaned input: "${cleanInput}"`);
+            console.log(`Reversed: "${reversed}"`);
+            console.log(`Are they equal? ${cleanInput === reversed}`);
+          }
+        });
+      }
     }
   };
 
   // Update handleSubmitSolution to use the loading state
-  const handleSubmitSolution = () => {
+  const handleSubmitSolution = async () => {
     if (currentQuestion && user?.email) {
       setDebugMsg('Submitting solution...');
       setIsSubmitting(true); // Start loading animation
       
-      submissionService.runTestCases(
-        userCode, 
-        selectedLanguage,
-        currentQuestion.testCases
-      ).then(results => {
-        console.log('Submission results:', results);
-        
-        // If all tests passed, update score and show celebration
-        if (results.passed === results.total) {
-          // Update local score state
-          const updatedScores = { ...playerScores };
-          const userEmail = user.email || '';
-          updatedScores[userEmail] = (updatedScores[userEmail] || 0) + 1;
-          setPlayerScores(updatedScores);
-          
-          // Add to completed questions
-          const updatedCompletedQuestions = { ...completedQuestions };
-          if (!updatedCompletedQuestions[userEmail]) {
-            updatedCompletedQuestions[userEmail] = [];
-          }
-          
-          // Only add to completed if not already present
-          if (!updatedCompletedQuestions[userEmail].includes(currentQuestion.id)) {
-            updatedCompletedQuestions[userEmail].push(currentQuestion.id);
-            setCompletedQuestions(updatedCompletedQuestions);
-            
-            // Broadcast the update to other clients
-            const completedChannel = supabase.channel('completed_questions', {
-              config: {
-                broadcast: { self: true }
-              }
-            });
-            
-            completedChannel.subscribe(async (status) => {
-              if (status === 'SUBSCRIBED') {
-                await completedChannel.send({
-                  type: 'broadcast',
-                  event: 'question_completed',
-                  payload: { 
-                    completedQuestions: updatedCompletedQuestions,
-                    user: userEmail,
-                    questionId: currentQuestion.id,
-                    timestamp: new Date().toISOString()
-                  }
-                });
-                
-                setTimeout(() => {
-                  completedChannel.unsubscribe();
-                }, 1000);
-              }
-            });
-          }
-          
-          setDebugMsg(`🎉 Solution successful: ${results.passed}/${results.total} tests passed!`);
-          
-          // Show celebration animation
-          celebrateSuccess();
-          
-          // Broadcast score update with proper subscription
-          const scoreChannel = supabase.channel('battle_scores', {
-            config: {
-              broadcast: { self: true } // Allow self-receiving to ensure all clients get updates
-            }
-          });
-          
-          scoreChannel.subscribe(async (status) => {
-            if (status !== 'SUBSCRIBED') {
-              console.log('Score channel status:', status);
-              return;
-            }
-            
-            console.log('Score channel subscribed, broadcasting score update');
-            
-            await scoreChannel.send({
-              type: 'broadcast',
-              event: 'score_update',
-              payload: { 
-                scores: updatedScores,
-                user: userEmail,
-                timestamp: new Date().toISOString()
-              }
-            });
-            
-            console.log('Score update broadcast sent');
-            
-            // Unsubscribe after sending to avoid keeping too many channels open
-            setTimeout(() => {
-              scoreChannel.unsubscribe();
-            }, 1000);
-          });
-        } else {
-          // Show a more detailed error message for failed tests
-          if (results.failedTests && results.failedTests.length > 0) {
-            const failedTest = results.failedTests[0]; // Get the first failed test for the message
-            setDebugMsg(`❌ Failed: ${results.passed}/${results.total} tests passed. Check the test results for details.`);
-          } else {
-            setDebugMsg(`Solution submitted: ${results.passed}/${results.total} tests passed`);
-          }
+      try {
+        // Prepare submission for Judge0
+        const languageId = LANGUAGE_IDS[selectedLanguage as keyof typeof LANGUAGE_IDS];
+        if (!languageId) {
+          throw new Error(`Unsupported language: ${selectedLanguage}`);
         }
-        setIsSubmitting(false); // End loading animation
-      }).catch(error => {
+
+        // Separate visible and hidden tests for debugging
+        const visibleTests = currentQuestion.testCases.filter(test => !test.isHidden);
+        const hiddenTests = currentQuestion.testCases.filter(test => test.isHidden);
+        
+        console.log('Visible tests:', visibleTests.length, visibleTests);
+        console.log('Hidden tests:', hiddenTests.length, hiddenTests);
+        
+        // Properly format ALL test cases to ensure expected field is populated
+        const formattedTestCases = currentQuestion.testCases.map(test => ({
+          input: test.input,
+          expected: test.output // Ensure expected field is populated from output
+        }));
+
+        const submissionPayload = {
+          source_code: userCode,
+          language_id: languageId,
+          stdin: JSON.stringify({ testCases: formattedTestCases }), // Use properly formatted test cases
+        };
+
+        // Use submitCode which runs the embedded test runner
+        const result: JudgeResult = await submissionService.submitCode(submissionPayload);
+        
+        console.log('Submission result:', result);
+
+        // Check Judge0 status first
+        if (result.status.id === JUDGE_STATUS.ACCEPTED) {
+          // If accepted, parse the stdout which contains our test runner JSON output
+          if (result.stdout) {
+            try {
+              const runnerOutput = JSON.parse(result.stdout);
+              if (runnerOutput.summary) {
+                const passed = runnerOutput.summary.passed;
+                const total = runnerOutput.summary.total;
+                
+                // If all tests passed, update score and show celebration
+                if (passed === total) {
+                  // Update local score state
+                  const updatedScores = { ...playerScores };
+                  const userEmail = user.email || '';
+                  updatedScores[userEmail] = (updatedScores[userEmail] || 0) + 1;
+                  setPlayerScores(updatedScores);
+                  
+                  // Add to completed questions
+                  const updatedCompletedQuestions = { ...completedQuestions };
+                  if (!updatedCompletedQuestions[userEmail]) {
+                    updatedCompletedQuestions[userEmail] = [];
+                  }
+                  
+                  // Only add to completed if not already present
+                  if (!updatedCompletedQuestions[userEmail].includes(currentQuestion.id)) {
+                    updatedCompletedQuestions[userEmail].push(currentQuestion.id);
+                    setCompletedQuestions(updatedCompletedQuestions);
+                    
+                    // Broadcast the update to other clients
+                    const completedChannel = supabase.channel('completed_questions', {
+                      config: {
+                        broadcast: { self: true }
+                      }
+                    });
+                    
+                    completedChannel.subscribe(async (status) => {
+                      if (status === 'SUBSCRIBED') {
+                        await completedChannel.send({
+                          type: 'broadcast',
+                          event: 'question_completed',
+                          payload: { 
+                            completedQuestions: updatedCompletedQuestions,
+                            user: userEmail,
+                            questionId: currentQuestion.id,
+                            timestamp: new Date().toISOString()
+                          }
+                        });
+                        
+                        setTimeout(() => {
+                          completedChannel.unsubscribe();
+                        }, 1000);
+                      }
+                    });
+                  }
+                  
+                  setDebugMsg(`🎉 Solution successful: ${passed}/${total} tests passed!`);
+                  
+                  // Show celebration animation
+                  celebrateSuccess();
+                  
+                  // Broadcast score update with proper subscription
+                  const scoreChannel = supabase.channel('battle_scores', {
+                    config: {
+                      broadcast: { self: true } // Allow self-receiving to ensure all clients get updates
+                    }
+                  });
+                  
+                  scoreChannel.subscribe(async (status) => {
+                    if (status !== 'SUBSCRIBED') {
+                      console.log('Score channel status:', status);
+                      return;
+                    }
+                    
+                    console.log('Score channel subscribed, broadcasting score update');
+                    
+                    await scoreChannel.send({
+                      type: 'broadcast',
+                      event: 'score_update',
+                      payload: { 
+                        scores: updatedScores,
+                        user: userEmail,
+                        timestamp: new Date().toISOString()
+                      }
+                    });
+                    
+                    console.log('Score update broadcast sent');
+                    
+                    // Unsubscribe after sending to avoid keeping too many channels open
+                    setTimeout(() => {
+                      scoreChannel.unsubscribe();
+                    }, 1000);
+                  });
+                } else {
+                  // Some tests failed
+                  // Get more detailed info about the failures
+                  const failedTests = runnerOutput.results?.filter((r: any) => !r.passed) || [];
+                  
+                  // Check if these are hidden test cases
+                  let hiddenFailures = 0;
+                  let visibleFailures = 0;
+                  
+                  const visibleTestCount = visibleTests?.length || 0;
+                  
+                  failedTests.forEach((failedTest: any, index: number) => {
+                    // Try to determine if this is a hidden test by matching input
+                    const matchesVisibleTest = visibleTests.some(t => t.input === failedTest.input);
+                    if (!matchesVisibleTest) {
+                      console.log(`Hidden test failed:`, failedTest);
+                      hiddenFailures++;
+                    } else {
+                      console.log(`Visible test failed:`, failedTest);
+                      visibleFailures++;
+                    }
+                  });
+                  
+                  if (hiddenFailures > 0) {
+                    setDebugMsg(`❌ Failed: ${passed}/${total} tests passed. Your code may work for the ${visibleTestCount - visibleFailures} visible test cases but fails on ${hiddenFailures} hidden test cases that check edge cases!`);
+                  } else {
+                    setDebugMsg(`❌ Failed: ${passed}/${total} tests passed. Check the test results for details.`);
+                  }
+                }
+                
+                // Ensure test results have expected field populated from output field
+                if (runnerOutput.testResults) {
+                  const formattedResults = {
+                    ...runnerOutput,
+                    passedTests: runnerOutput.passedTests?.map((test: any) => ({
+                      ...test,
+                      expected: test.expected || test.output
+                    })),
+                    failedTests: runnerOutput.failedTests?.map((test: any) => ({
+                      ...test,
+                      expected: test.expected || test.output
+                    }))
+                  };
+                  setTestResults(formattedResults);
+                  setActiveView('output');
+                }
+              } else {
+                throw new Error('Test runner output format invalid (missing summary)');
+              }
+            } catch (parseError) {
+              console.error('Error parsing submission output:', parseError, result.stdout);
+              setDebugMsg('Error processing submission results.');
+            }
+          } else {
+            setDebugMsg('Submission ran, but no output received.');
+          }
+        } else {
+          // Handle other Judge0 statuses (Compile Error, Runtime Error, etc.)
+          setDebugMsg(`Submission Failed: ${result.status.description}. ${result.stderr || result.compile_output || result.message || ''}`);
+        }
+
+      } catch (error) {
         console.error('Error submitting solution:', error);
         setDebugMsg(`Error submitting: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        setIsSubmitting(false); // End loading animation on error
-      });
+      } finally {
+        setIsSubmitting(false); // End loading animation
+      }
     }
   };
 
@@ -822,40 +936,34 @@ function merge(nums1, m, nums2, n) {
                                 
                                 {/* Display test cases */}
                                 <div className="space-y-px border border-gray-700 rounded-md overflow-hidden bg-gray-800">
-                                  {testResults.passed === testResults.total ? (
+                                  {testResults.passed === testResults.total && (
                                     <div className="py-4 text-center text-green-400 font-medium">
                                       You have passed all of the tests! :)
                                     </div>
-                                  ) : (
-                                    // Map failed test cases
-                                    testResults.failedTests?.map((test, idx) => (
-                                      <TestResultItem 
-                                        key={idx} 
-                                        index={test.index} 
-                                        input={test.input} 
-                                        expected={test.expected} 
-                                        actual={test.actual}
-                                        passed={false}
-                                      />
-                                    ))
                                   )}
                                   
-                                  {/* Show passed test indexes if any */}
-                                  {testResults.passed > 0 && Array.from({ length: testResults.passed }).map((_, idx) => {
-                                    // Calculate the index for passed tests
-                                    // This is a simplification - ideally we would know which tests passed
-                                    const testIndex = (testResults.failedTests?.length || 0) > 0 
-                                      ? `[-${idx + 1}]` // Just assign some placeholder index
-                                      : `Test #${idx + 1}`;
-                                    
-                                    return (
-                                      <TestResultItem 
-                                        key={`passed-${idx}`} 
-                                        index={testIndex}
-                                        passed={true}
-                                      />
-                                    );
-                                  })}
+                                  {/* Always show all tests (both passed and failed) */}
+                                  {testResults.passedTests?.map((test: TestResultItemDetails) => (
+                                    <TestResultItem 
+                                      key={`passed-${test.index}`}
+                                      index={test.index}
+                                      input={test.input}
+                                      expected={test.expected}
+                                      actual={test.actual}
+                                      passed={true}
+                                    />
+                                  ))}
+                                  
+                                  {testResults.failedTests?.map((test) => (
+                                    <TestResultItem 
+                                      key={`failed-${test.index}`} 
+                                      index={test.index} 
+                                      input={test.input} 
+                                      expected={test.expected} 
+                                      actual={test.actual}
+                                      passed={false}
+                                    />
+                                  ))}
                                 </div>
                               </div>
                             </div>
