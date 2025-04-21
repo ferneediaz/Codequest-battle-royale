@@ -1,5 +1,5 @@
 /// <reference path="../types/codemirror.d.ts" />
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,7 +10,8 @@ import { BattleSession } from '../lib/supabase-types';
 import { supabase } from '../lib/supabase';
 import { setupBattleSessionsTable, checkTableExists } from '../lib/setupDatabase';
 import { submissionService, LANGUAGE_IDS, JudgeResult, JUDGE_STATUS } from '../services/submissionService';
-import { problemService, CodeProblem } from '../services/problemService';
+import { CodeProblem } from '../services/problemService';
+import { activeProblemService } from '../services/serviceConfig';
 import FloatingCodeBackground from '../components/FloatingCodeBackground';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
@@ -223,25 +224,94 @@ function merge(nums1, m, nums2, n) {
   const heartbeatIntervalRef = useRef<number | null>(null);
   
   const {
+    loading: questionLoading,
+    problems,
+    currentProblem,
+    setCurrentProblem,
+    initialize,
+    loadProblemsByCategory,
+    getRandomProblem,
+    loadProblemById
+  } = useQuestionLoader();
+
+  const {
     timeRemaining,
     startTimer,
     stopTimer,
     resetTimer
   } = useBattleTimer({ initialSeconds: 300 });
+
+  // Create compatibility variables for the old hook interface
+  const [availableQuestions, setAvailableQuestions] = useState<CodeProblem[]>([]);
+  const [isQuestionSelected, setIsQuestionSelected] = useState(false);
+  const [activeTopicFilter, setActiveTopicFilter] = useState<string | null>(null);
   
-  const {
-    availableQuestions,
-    currentQuestion,
-    isQuestionSelected,
-    activeTopicFilter,
-    loadQuestionsForSelectedTopics,
-    loadRandomProblemForBattle,
-    selectQuestion,
-    getFilteredQuestions,
-    setActiveTopicFilter,
-    setIsQuestionSelected,
-    backToQuestionList
-  } = useQuestionLoader();
+  // Map the currentProblem to what was previously called currentQuestion
+  const currentQuestion = currentProblem;
+  
+  // Add dependency for memoization to prevent re-creation
+  const loadQuestionsForSelectedTopics = useCallback(async (categories: BattleCategory[]) => {
+    try {
+      const result = await loadProblemsByCategory(categories);
+      // Flatten the problems by category into a single array
+      const allProblems = Object.values(result || {}).flat();
+      setAvailableQuestions(allProblems);
+      return allProblems;
+    } catch (error) {
+      console.error('Error in loadQuestionsForSelectedTopics:', error);
+      setAvailableQuestions([]);
+      return [];
+    }
+  }, [loadProblemsByCategory]);
+  
+  const loadRandomProblemForBattle = async (categories: BattleCategory[]) => {
+    try {
+      if (!categories?.length) return null;
+      const problem = getRandomProblem(categories[0]);
+      return problem;
+    } catch (error) {
+      console.error('Error in loadRandomProblemForBattle:', error);
+      return null;
+    }
+  };
+  
+  const selectQuestion = useCallback((problem: CodeProblem) => {
+    try {
+      console.log('Selecting question:', problem);
+      setCurrentProblem(problem);
+      setIsQuestionSelected(true);
+      // Make sure state update is applied
+      setTimeout(() => {
+        if (problem?.starterCode?.[selectedLanguage]) {
+          setUserCode(problem.starterCode[selectedLanguage]);
+        }
+      }, 0);
+      return problem;
+    } catch (error) {
+      console.error('Error in selectQuestion:', error);
+      return problem;
+    }
+  }, [selectedLanguage]);
+  
+  const getFilteredQuestions = () => {
+    try {
+      if (!activeTopicFilter) {
+        return availableQuestions || [];
+      }
+      return (availableQuestions || []).filter(q => q?.category === activeTopicFilter);
+    } catch (error) {
+      console.error('Error in getFilteredQuestions:', error);
+      return [];
+    }
+  };
+  
+  const backToQuestionList = () => {
+    try {
+      setIsQuestionSelected(false);
+    } catch (error) {
+      console.error('Error in backToQuestionList:', error);
+    }
+  };
 
   // Update code when the selected problem changes
   useEffect(() => {
@@ -442,6 +512,27 @@ function merge(nums1, m, nums2, n) {
 
   // Update handleTestRun to use the loading state
   const handleTestRun = (results: any, isRunning: boolean) => {
+    // Ensure results have properly formatted test cases
+    if (results && results.failedTests) {
+      // Make sure each test case has input, expected, and actual values
+      results.failedTests = results.failedTests.map((test: any, i: number) => ({
+        ...test,
+        input: test.input || `Test case ${i+1}`,
+        expected: test.expected || "true",
+        actual: test.actual || "false"
+      }));
+      
+      // Also ensure each passed test case has input and expected values
+      if (results.passedTests) {
+        results.passedTests = results.passedTests.map((test: any, i: number) => ({
+          ...test,
+          input: test.input || `Test case ${i+1}`,
+          expected: test.expected || "true",
+          actual: test.actual || test.expected || "true"
+        }));
+      }
+    }
+    
     setTestResults(results);
     setIsRunningTests(isRunning);
     
@@ -459,7 +550,7 @@ function merge(nums1, m, nums2, n) {
           
           // For palindrome problem - debug the algorithm
           if (currentQuestion?.id === 'valid-palindrome') {
-            const cleanInput = test.input.replace(/^"|"$/g, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
+            const cleanInput = String(test.input).replace(/^"|"$/g, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
             const reversed = cleanInput.split('').reverse().join('');
             console.log(`Cleaned input: "${cleanInput}"`);
             console.log(`Reversed: "${reversed}"`);
@@ -671,11 +762,37 @@ function merge(nums1, m, nums2, n) {
   };
 
   // Handle selecting a random challenge
-  const handleRandomChallenge = () => {
-    loadRandomProblemForBattle(selectedTopics);
-    setIsQuestionSelected(true);
-    startTimer();
-  };
+  const handleRandomChallenge = useCallback(() => {
+    if (selectedTopics.length === 0) {
+      setDebugMsg("Error: No topics selected");
+      return;
+    }
+    
+    console.log('Selected topics for random challenge:', selectedTopics);
+    
+    // Pick a random topic from selected topics
+    const randomTopic = selectedTopics[Math.floor(Math.random() * selectedTopics.length)];
+    
+    // Get a random problem from that topic
+    const problem = getRandomProblem(randomTopic);
+    if (problem) {
+      console.log('Selected random problem:', problem);
+      setCurrentProblem(problem);
+      setIsQuestionSelected(true);
+      
+      // Make sure state update is applied
+      setTimeout(() => {
+        if (problem.starterCode?.[selectedLanguage]) {
+          setUserCode(problem.starterCode[selectedLanguage]);
+        }
+      }, 0);
+      
+      startTimer();
+    } else {
+      console.error('No problem found for random challenge');
+      setDebugMsg("Couldn't find a random challenge. Try again.");
+    }
+  }, [selectedTopics, getRandomProblem, selectedLanguage, startTimer]);
 
   // Function to trigger celebration animation
   const celebrateSuccess = () => {
@@ -1112,9 +1229,12 @@ function merge(nums1, m, nums2, n) {
   useEffect(() => {
     if (!user?.email || !sessionId) return;
     
-    console.log('Setting up battle skills effect listener');
+    // Create a stable channel ID using the user's email (replace @ with _at_)
+    const channelId = `battle_skills_${user.email.replace('@', '_at_')}_${sessionId}`;
     
-    const skillsChannel = supabase.channel('battle_skills_listener', {
+    console.log(`Setting up battle skills effect listener for channel: ${channelId}`);
+    
+    const skillsChannel = supabase.channel(channelId, {
       config: {
         broadcast: { self: false } // Don't receive our own broadcasts
       }
@@ -1122,7 +1242,7 @@ function merge(nums1, m, nums2, n) {
     
     skillsChannel
       .on('broadcast', { event: 'skill_used' }, (payload) => {
-        console.log('Received skill effect:', payload);
+        console.log(`Received skill effect on channel ${channelId}:`, payload);
         
         // Check if the skill is targeted at this user
         if (payload.payload.target_user === user.email) {
@@ -1140,14 +1260,14 @@ function merge(nums1, m, nums2, n) {
         }
       })
       .subscribe((status) => {
-        console.log('Skills listener channel status:', status);
+        console.log(`Skills listener channel status for ${channelId}:`, status);
       });
       
     return () => {
-      console.log('Unsubscribing from skills channel');
+      console.log(`Unsubscribing from skills channel: ${channelId}`);
       skillsChannel.unsubscribe();
     };
-  }, [user?.email, sessionId, handleFreezeEffect, userCode]);
+  }, [user?.email, sessionId, handleFreezeEffect, handleChaosEffect]);
   
   // Create a reliable channel for score updates
   useEffect(() => {
@@ -1180,10 +1300,10 @@ function merge(nums1, m, nums2, n) {
 
   // Auto-load questions when entering battle room
   useEffect(() => {
-    if (battleState === 'battle_room' && selectedTopics.length > 0) {
+    if (battleState === 'battle_room' && selectedTopics.length > 0 && availableQuestions.length === 0) {
       loadQuestionsForSelectedTopics(selectedTopics);
     }
-  }, [battleState, selectedTopics, loadQuestionsForSelectedTopics]);
+  }, [battleState, selectedTopics, loadQuestionsForSelectedTopics, availableQuestions.length]);
 
   // Cleanup when user leaves the page
   useEffect(() => {

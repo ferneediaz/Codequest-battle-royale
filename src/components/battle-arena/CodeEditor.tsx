@@ -55,7 +55,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   const [isRunningTests, setIsRunningTests] = useState(false);
 
   // Run test cases
-    const runTestCases = async () => {
+  const runTestCases = async () => {
     if (!currentQuestion) return;
     
     setIsRunningTests(true);
@@ -101,20 +101,19 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
               const failed = runnerOutput.results
                 .filter((r: any) => !r.passed)
                 .map((r: any, index: number): TestResultItemDetails => ({ 
-                  input: r.input,
-                  expected: r.expected,
-                  actual: r.output,
+                  input: r.input || formattedTestCases[index]?.input || `Test case ${index + 1}`,
+                  expected: r.expected || formattedTestCases[index]?.expected || "true",
+                  actual: r.output || "undefined",
                   index: index + 1 // Use 1-based index for display
                 }));
                 
               const passed = runnerOutput.results
                 .filter((r: any) => r.passed)
                 .map((r: any, index: number): TestResultItemDetails => ({ 
-                  input: r.input, 
-                  expected: r.expected, 
-                  actual: r.output, 
-                  // Assign a temporary index or find a way to get the original index if needed
-                  index: index + 1 // Use 1-based index for display (adjust if original index available)
+                  input: r.input || formattedTestCases[index]?.input || `Test case ${index + 1}`, 
+                  expected: r.expected || formattedTestCases[index]?.expected || "true", 
+                  actual: r.output || r.expected || "true", 
+                  index: index + 1 // Use 1-based index for display
                 }));
 
               testResults = {
@@ -123,6 +122,17 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
                 failedTests: failed,
                 passedTests: passed // Include passed tests details
               };
+              
+              // Ensure we have input and expected values for every test case
+              if (testResults.failedTests) {
+                testResults.failedTests = testResults.failedTests.map((test, i) => ({
+                  ...test,
+                  input: test.input || `Test case ${i+1}`,
+                  expected: test.expected || "true",
+                  actual: test.actual || "false"
+                }));
+              }
+              
               setDebugMsg(`${testResults.passed}/${testResults.total} tests passed`);
             } else {
               throw new Error('Test runner output format invalid');

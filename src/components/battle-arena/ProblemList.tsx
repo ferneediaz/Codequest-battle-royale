@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,7 @@ interface ProblemListProps {
   currentUserEmail?: string;
 }
 
-const ProblemList: React.FC<ProblemListProps> = ({
+const ProblemList: React.FC<ProblemListProps> = memo(({
   selectedTopics,
   availableQuestions,
   activeTopicFilter,
@@ -32,6 +32,27 @@ const ProblemList: React.FC<ProblemListProps> = ({
   const isQuestionCompleted = (questionId: string) => {
     return completedQuestions.includes(questionId);
   };
+
+  // Safely get filtered questions with error handling
+  const filteredQuestions = useMemo(() => {
+    try {
+      if (!availableQuestions || !Array.isArray(availableQuestions)) {
+        console.log('Available questions is not an array:', availableQuestions);
+        return [];
+      }
+      
+      const questions = getFilteredQuestions();
+      if (!questions || !Array.isArray(questions)) {
+        console.log('Filtered questions is not an array:', questions);
+        return [];
+      }
+      
+      return questions;
+    } catch (error) {
+      console.error('Error getting filtered questions:', error);
+      return [];
+    }
+  }, [availableQuestions, getFilteredQuestions]);
 
   return (
     <Card className="bg-gray-800 p-4 overflow-y-auto h-[600px]">
@@ -77,8 +98,10 @@ const ProblemList: React.FC<ProblemListProps> = ({
       
       {/* Questions list */}
       <div className="space-y-3">
-        {availableQuestions.length > 0 ? (
-          getFilteredQuestions().map((question, index) => {
+        {Array.isArray(availableQuestions) && availableQuestions.length > 0 ? (
+          filteredQuestions.map((question, index) => {
+            if (!question) return null;
+            
             const completed = isQuestionCompleted(question.id);
             
             return (
@@ -106,14 +129,14 @@ const ProblemList: React.FC<ProblemListProps> = ({
                     question.difficulty === 'medium' ? 'bg-yellow-600' : 
                     'bg-red-600'
                   }>
-                    {question.difficulty.toUpperCase()}
+                    {question.difficulty?.toUpperCase() || 'UNKNOWN'}
                   </Badge>
                 </div>
                 <p className={`text-xs ${completed ? 'text-gray-400' : 'text-gray-300'} line-clamp-2`}>
-                  {question.description.replace(/<[^>]*>/g, ' ')}
+                  {question.description?.replace(/<[^>]*>/g, ' ') || 'No description available'}
                 </p>
                 <div className="mt-2 text-xs text-gray-400">
-                  Category: {question.category}
+                  Category: {question.category || 'Unknown'}
                 </div>
               </div>
             );
@@ -127,7 +150,7 @@ const ProblemList: React.FC<ProblemListProps> = ({
           </div>
         }
         
-        {availableQuestions.length > 0 && getFilteredQuestions().length === 0 && (
+        {Array.isArray(availableQuestions) && availableQuestions.length > 0 && filteredQuestions.length === 0 && (
           <div className="text-center py-8">
             <div className="text-3xl mb-3">🧩</div>
             <p className="text-gray-400">No questions found for {activeTopicFilter}</p>
@@ -152,6 +175,8 @@ const ProblemList: React.FC<ProblemListProps> = ({
       </div>
     </Card>
   );
-};
+});
+
+ProblemList.displayName = 'ProblemList';
 
 export default ProblemList; 

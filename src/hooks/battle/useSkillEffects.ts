@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { CODE_GIBBERISH } from '../../constants/battleConstants';
 
@@ -17,8 +17,8 @@ export const useSkillEffects = ({ userEmail, sessionId, battleState }: UseSkillE
   ]);
   const [debugMsg, setDebugMsg] = useState<string | null>(null);
   
-  // Function to use a skill against another player
-  const useSkill = async (skillName: string, targetEmail: string) => {
+  // Function to use a skill against another player - memoized
+  const useSkill = useCallback(async (skillName: string, targetEmail: string) => {
     if (!userEmail) return;
     
     // Find the skill and mark it as unavailable
@@ -89,10 +89,10 @@ export const useSkillEffects = ({ userEmail, sessionId, battleState }: UseSkillE
         )
       );
     }
-  };
+  }, [userEmail, sessionId]); // Dependencies for useSkill
   
-  // Handle skill effects
-  const handleFreezeEffect = (fromUser: string) => {
+  // Handle skill effects - memoized
+  const handleFreezeEffect = useCallback((fromUser: string) => {
     // Freeze the editor for 10 seconds
     setEditorFrozen(true);
     setEditorFrozenEndTime(Date.now() + 10000); // 10 seconds from now
@@ -106,9 +106,9 @@ export const useSkillEffects = ({ userEmail, sessionId, battleState }: UseSkillE
     }, 10000);
     
     return () => clearTimeout(unfreezeTimer);
-  };
+  }, []);
   
-  const handleChaosEffect = (fromUser: string, userCode: string, setUserCode: (code: string) => void) => {
+  const handleChaosEffect = useCallback((fromUser: string, userCode: string, setUserCode: (code: string) => void) => {
     // Insert random gibberish at random positions in the code
     setDebugMsg(`💥 ${fromUser} cast Code Chaos on your editor!`);
     
@@ -138,31 +138,34 @@ export const useSkillEffects = ({ userEmail, sessionId, battleState }: UseSkillE
     
     // Update the code with gibberish
     setUserCode(newCode);
-  };
+  }, []);
   
   // Listen for skill effects applied to this user
   useEffect(() => {
-    if (!userEmail || !sessionId) return;
+    if (!userEmail || !sessionId || battleState !== 'battle_room') return;
     
     console.log('Setting up skill effects listener...');
     
+    // Create a channel with a stable ID to prevent multiple subscriptions
+    const channelId = `skills_listener_${userEmail}`;
+    
     // Create a channel to receive skill updates
-    const skillsChannel = supabase.channel('battle_skills_listener', {
+    const skillsChannel = supabase.channel(channelId, {
       config: {
         broadcast: { self: false } // Don't receive your own broadcasts
       }
     });
     
     // Subscribe to skill events
-    const subscription = skillsChannel
+    skillsChannel
       .on('broadcast', { event: 'skill_used' }, (payload) => {
         console.log('Received skill effect:', payload);
-        
         // Only used for validation against re-renders - implementations in the component
       })
       .subscribe();
       
     return () => {
+      console.log(`Cleaning up skills listener for ${channelId}`);
       skillsChannel.unsubscribe();
     };
   }, [userEmail, sessionId, battleState]);

@@ -1,136 +1,64 @@
+import { CodeProblem } from '../../services/problemService';
+import { activeProblemService } from '../../services/serviceConfig';
 import { useState, useCallback } from 'react';
-import { problemService, CodeProblem } from '../../services/problemService';
 import { BattleCategory } from '../../constants/battleConstants';
 
 export const useQuestionLoader = () => {
-  const [availableQuestions, setAvailableQuestions] = useState<CodeProblem[]>([]);
-  const [currentQuestion, setCurrentQuestion] = useState<CodeProblem | null>(null);
-  const [isQuestionSelected, setIsQuestionSelected] = useState<boolean>(false);
-  const [activeTopicFilter, setActiveTopicFilter] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
+  const [problems, setProblems] = useState<Record<BattleCategory, CodeProblem[]>>({} as Record<BattleCategory, CodeProblem[]>);
+  const [currentProblem, setCurrentProblem] = useState<CodeProblem | null>(null);
   
-  // Load questions for selected topics
-  const loadQuestionsForSelectedTopics = useCallback(async (selectedTopics: BattleCategory[], retryCount = 0): Promise<CodeProblem[]> => {
-    if (selectedTopics.length === 0) return [];
-    
-    setIsLoading(true);
-    
-    try {
-      // Initialize problem service if needed
-      if (!problemService.isInitialized()) {
-        await problemService.initialize();
-      }
-      
-      // Get available problems from both selected topics
-      let allQuestions: CodeProblem[] = [];
-      
-      for (const category of selectedTopics) {
-        const topicQuestions = problemService.getProblemsByCategory(category);
-        allQuestions = [...allQuestions, ...topicQuestions];
-      }
-      
-      if (allQuestions.length > 0) {
-        console.log(`Loaded ${allQuestions.length} questions for selected topics`);
-        setAvailableQuestions(allQuestions);
-        setIsLoading(false);
-        return allQuestions;
-      } else {
-        console.error('No questions found for selected topics');
-        // Add max retry logic
-        if (retryCount < 3) {
-          console.log(`Retry attempt ${retryCount + 1} for loading questions`);
-          // Wait a moment and retry
-          return new Promise(resolve => {
-            setTimeout(async () => {
-              const questions = await loadQuestionsForSelectedTopics(selectedTopics, retryCount + 1);
-              resolve(questions);
-            }, 1000);
-          });
-        } else {
-          // After 3 retries, set an empty array
-          setAvailableQuestions([]);
-          setIsLoading(false);
-          return [];
-        }
-      }
-    } catch (error) {
-      console.error('Error loading questions:', error);
-      // Add max retry logic
-      if (retryCount < 3) {
-        console.log(`Retry attempt ${retryCount + 1} for loading questions after error`);
-        // Wait a moment and retry
-        return new Promise(resolve => {
-          setTimeout(async () => {
-            const questions = await loadQuestionsForSelectedTopics(selectedTopics, retryCount + 1);
-            resolve(questions);
-          }, 1000);
-        });
-      } else {
-        // After 3 retries, set an empty array
-        setAvailableQuestions([]);
-        setIsLoading(false);
-        return [];
-      }
+  const initialize = useCallback(async () => {
+    if (!activeProblemService.isInitialized()) {
+      setLoading(true);
+      console.log('Initializing problem service from hook...');
+      await activeProblemService.initialize();
+      setLoading(false);
     }
   }, []);
   
-  // Load a random problem for the battle
-  const loadRandomProblemForBattle = useCallback(async (selectedTopics: BattleCategory[]): Promise<CodeProblem | null> => {
-    if (selectedTopics.length === 0) return null;
+  const loadProblemsByCategory = useCallback(async (categories: BattleCategory[]) => {
+    setLoading(true);
+    await initialize();
     
-    // Initialize problem service if needed
-    if (!problemService.isInitialized()) {
-      await problemService.initialize();
+    const loadedProblems: Record<BattleCategory, CodeProblem[]> = {} as Record<BattleCategory, CodeProblem[]>;
+    
+    for (const category of categories) {
+      loadedProblems[category] = activeProblemService.getProblemsByCategory(category);
     }
     
-    // Get a random problem from the first selected topic
-    const category = selectedTopics[0];
-    const problems = problemService.getRandomProblemsByCategory(category, 1);
+    setProblems(loadedProblems);
+    setLoading(false);
     
-    if (problems.length > 0) {
-      setCurrentQuestion(problems[0]);
-      return problems[0];
-    } else {
-      console.error('No problems found for category:', category);
-      return null;
-    }
-  }, []);
+    return loadedProblems;
+  }, [initialize]);
   
-  // Select a specific question
-  const selectQuestion = useCallback((problem: CodeProblem) => {
-    console.log('[useQuestionLoader] Selecting question:', problem.id);
-    console.log('[useQuestionLoader] Test Cases for selected question:', JSON.stringify(problem.testCases));
-    
-    setCurrentQuestion(problem);
-    setIsQuestionSelected(true);
+  const getRandomProblem = useCallback((category: BattleCategory, difficulty?: 'easy' | 'medium' | 'hard') => {
+    const categoryProblems = activeProblemService.getRandomProblemsByCategory(category, 1, difficulty);
+    const problem = categoryProblems.length > 0 ? categoryProblems[0] : null;
+    setCurrentProblem(problem);
     return problem;
   }, []);
   
-  // Get filtered questions based on activeTopicFilter
-  const getFilteredQuestions = useCallback(() => {
-    if (!activeTopicFilter) {
-      return availableQuestions;
-    }
-    return availableQuestions.filter(q => q.category === activeTopicFilter);
-  }, [availableQuestions, activeTopicFilter]);
-  
-  // Go back to question list
-  const backToQuestionList = useCallback(() => {
-    setIsQuestionSelected(false);
-  }, []);
+  const loadProblemById = useCallback(async (id: string) => {
+    setLoading(true);
+    await initialize();
+    
+    const problem = await activeProblemService.getProblemById(id);
+    setCurrentProblem(problem || null);
+    setLoading(false);
+    
+    return problem;
+  }, [initialize]);
   
   return {
-    availableQuestions,
-    currentQuestion,
-    isQuestionSelected,
-    activeTopicFilter,
-    isLoading,
-    loadQuestionsForSelectedTopics,
-    loadRandomProblemForBattle,
-    selectQuestion,
-    getFilteredQuestions,
-    setActiveTopicFilter,
-    setIsQuestionSelected,
-    backToQuestionList
+    loading,
+    problems,
+    currentProblem,
+    setCurrentProblem,
+    initialize,
+    loadProblemsByCategory,
+    getRandomProblem,
+    loadProblemById
   };
 }; 

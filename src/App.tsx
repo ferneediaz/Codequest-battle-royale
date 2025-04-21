@@ -1,9 +1,18 @@
+import { useEffect } from 'react';
 import HomePage from './pages/HomePage';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import BattleArena from './pages/BattleArena';
 import { AuthProvider } from './contexts/AuthContext';
+import { initializeAppServices } from './lib/initServices';
 
 const App = () => {
+  useEffect(() => {
+    // Initialize all services on app startup
+    initializeAppServices().catch(err => {
+      console.error('Failed to initialize services:', err);
+    });
+  }, []);
+
   return (
     <AuthProvider>
       <Router basename="/codequest-battle-royale">
