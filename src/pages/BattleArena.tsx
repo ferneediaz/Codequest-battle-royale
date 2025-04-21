@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { battleService } from '../services/battleService';
 import { BattleSession } from '../lib/supabase-types';
 import { supabase } from '../lib/supabase';
-import { setupBattleSessionsTable, checkTableExists } from '../lib/setupDatabase';
+import { setupBattleSessionsTable, checkTableExists, cleanupStaleReadyStates } from '../lib/setupDatabase';
 import { submissionService, LANGUAGE_IDS, JudgeResult, JUDGE_STATUS } from '../services/submissionService';
 import { CodeProblem } from '../services/problemService';
 import { activeProblemService } from '../services/serviceConfig';
@@ -166,6 +166,7 @@ const BattleArena: React.FC = () => {
   const [selectedTopics, setSelectedTopics] = useState<BattleCategory[]>([]);
   const [showTopicSelection, setShowTopicSelection] = useState(true);
   const [isTopicSelectionComplete, setIsTopicSelectionComplete] = useState(false);
+  const [topicSelections, setTopicSelections] = useState<Record<string, BattleCategory[]>>({});
   
   // Add user readiness tracking
   const [readyUsers, setReadyUsers] = useState<string[]>([]);
@@ -345,6 +346,15 @@ function merge(nums1, m, nums2, n) {
     // Only run initialization once, regardless of sessionId
     if (user && !loading && !hasInitializedRef.current) {
       hasInitializedRef.current = true;
+      
+      // One-time reset of user ready state on page load
+      console.log("🚀 CRITICAL FIX: Resetting user ready state on page load");
+      
+      // Set current user as not ready in state
+      setIsTopicSelectionComplete(false);
+      setReadyUsers([]);
+      
+      // Start normal initialization process
       handleInitialization();
     }
   }, [user, loading]);
@@ -376,6 +386,36 @@ function merge(nums1, m, nums2, n) {
             setConnectedUsers(connectedEmails);
             setPlayerCount(connectedEmails.length);
             setSetupStatus('verified');
+            
+            // Force current user to be not ready, regardless of database state
+            // The user must explicitly click the Ready button to be ready
+            console.log('🔴 CRITICAL: Explicitly marking current user as NOT ready on join');
+            setIsTopicSelectionComplete(false);
+            
+            // When initializing ready users from the database, remove the current user
+            let readyUsersList = Array.isArray(session.ready_users) ? [...session.ready_users] : [];
+            if (readyUsersList.includes(user.email)) {
+              console.log('🔴 Removing current user from ready list on join');
+              readyUsersList = readyUsersList.filter(email => email !== user.email);
+              
+              // Update database to ensure current user is not marked as ready
+              try {
+                await supabase
+                  .from('battle_sessions')
+                  .update({ 
+                    ready_users: readyUsersList,
+                  })
+                  .eq('id', 'default-battle-session');
+                  
+                console.log('✅ Updated database to mark user as not ready');
+              } catch (err) {
+                console.error('Error updating ready state in database:', err);
+              }
+            }
+            
+            // Set local ready users state (excluding current user)
+            setReadyUsers(readyUsersList);
+            
             setDebugMsg(connectedEmails.length > 1 ? 
               `Connected with ${connectedEmails.length} warriors!` : 
               'Connected! Waiting for other warriors...');
@@ -415,95 +455,121 @@ function merge(nums1, m, nums2, n) {
       // Otherwise add it
       return [...prev, topic];
     });
+    
+    // Remove the automatic ready state setting when topics change
+    // This ensures user must explicitly click the Ready button
+    if (isTopicSelectionComplete) {
+      setIsTopicSelectionComplete(false);
+      
+      // If user was previously marked as ready, remove them from ready list
+      if (user?.email && readyUsers.includes(user.email)) {
+        const updatedReadyUsers = readyUsers.filter(email => email !== user.email);
+        setReadyUsers(updatedReadyUsers);
+        
+        // Use an async function to handle the database update
+        const updateReadyUsers = async () => {
+          try {
+            const { data } = await supabase
+              .from('battle_sessions')
+              .select('ready_users')
+              .eq('id', 'default-battle-session')
+              .single();
+              
+            if (data?.ready_users) {
+              const dbReadyUsers = Array.isArray(data.ready_users) ? [...data.ready_users] : [];
+              const filteredUsers = dbReadyUsers.filter(email => email !== user.email);
+              
+              await supabase
+                .from('battle_sessions')
+                .update({ ready_users: filteredUsers })
+                .eq('id', 'default-battle-session');
+                
+              console.log('Removed user from ready list after topic change');
+            }
+          } catch (err) {
+            console.error('Failed to update ready status:', err);
+          }
+        };
+        
+        // Execute the update
+        updateReadyUsers();
+      }
+      
+      // Show the topic selection UI again
+      setShowTopicSelection(true);
+    }
   };
 
   // Add a handler for topic selection completion using presence
   const completeTopicSelection = async () => {
     if (selectedTopics.length !== 2 || !user?.email) return;
     
+    console.log("🚀 User clicked Ready for Battle button");
+    
+    // Mark the current user as ready (locally first)
     setIsTopicSelectionComplete(true);
     setDebugMsg(`Ready for battle with topics: ${selectedTopics.join(' & ')}`);
     
     try {
-      // Try to use an optimistic update approach with retry logic
-      let updateSuccessful = false;
-      let attempts = 0;
-      const maxAttempts = 3;
-      
-      while (!updateSuccessful && attempts < maxAttempts) {
-        attempts++;
-        
-        // Get current session data
-        const { data: currentSession, error: fetchError } = await supabase
-          .from('battle_sessions')
-          .select('ready_users, topic_selections')
-          .eq('id', 'default-battle-session')
-          .single();
+      // Get current session data
+      const { data: currentSession, error: fetchError } = await supabase
+        .from('battle_sessions')
+        .select('ready_users, topic_selections')
+        .eq('id', 'default-battle-session')
+        .single();
 
-        if (fetchError) {
-          console.error(`Error fetching session (attempt ${attempts}):`, fetchError);
-          if (attempts === maxAttempts) {
-            setDebugMsg('Error updating ready status after multiple attempts');
-            return;
-          }
-          // Short delay before retry
-          await new Promise(resolve => setTimeout(resolve, 300));
-          continue;
-        }
-        
-        // Prepare the updated ready_users array
-        let updatedReadyUsers: string[] = [];
-        if (currentSession?.ready_users) {
-          // Start with existing ready users
-          updatedReadyUsers = Array.isArray(currentSession.ready_users) 
-            ? [...currentSession.ready_users]
-            : [];
-            
-          // Only add the current user if not already in the list
-          if (user?.email && !updatedReadyUsers.includes(user.email)) {
-            updatedReadyUsers.push(user.email);
-          }
-        } else {
-          // If no ready users exist yet, create a new array with just this user
-          updatedReadyUsers = user.email ? [user.email] : [];
-        }
-        
-        // Prepare updated topic selections
-        const updatedTopicSelections = {
-          ...(currentSession?.topic_selections || {}),
-          [user.email]: selectedTopics
-        };
-        
-        // Run the update with our prepared arrays
-        const { error: updateError } = await supabase
-          .from('battle_sessions')
-          .update({
-            ready_users: updatedReadyUsers,
-            topic_selections: updatedTopicSelections,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', 'default-battle-session');
-            
-        if (updateError) {
-          console.error(`Error updating session (attempt ${attempts}):`, updateError);
-          if (attempts === maxAttempts) {
-            setDebugMsg('Error updating ready status after multiple attempts');
-            return;
-          }
-          // Short delay before retry
-          await new Promise(resolve => setTimeout(resolve, 300));
-          continue;
-        }
-        
-        // Update successful
-        updateSuccessful = true;
-        
-        // Update local state
-        setReadyUsers(updatedReadyUsers);
-        setShowTopicSelection(false);
-        
-        console.log('Updated ready status for user:', user.email);
+      if (fetchError) {
+        console.error(`Error fetching session:`, fetchError);
+        setDebugMsg('Error updating ready status');
+        return;
       }
+      
+      // Prepare the updated ready_users array
+      let updatedReadyUsers: string[] = [];
+      if (currentSession?.ready_users) {
+        // Start with existing ready users
+        updatedReadyUsers = Array.isArray(currentSession.ready_users) 
+          ? [...currentSession.ready_users]
+          : [];
+          
+        // Only add the current user if not already in the list
+        if (user?.email && !updatedReadyUsers.includes(user.email)) {
+          console.log(`Adding user ${user.email} to ready list`);
+          updatedReadyUsers.push(user.email);
+        }
+      } else {
+        // If no ready users exist yet, create a new array with just this user
+        updatedReadyUsers = user.email ? [user.email] : [];
+      }
+      
+      // Prepare updated topic selections
+      const updatedTopicSelections = {
+        ...(currentSession?.topic_selections || {}),
+        [user.email]: selectedTopics
+      };
+      
+      // Update local state
+      setReadyUsers(updatedReadyUsers);
+      setTopicSelections(updatedTopicSelections);
+      setShowTopicSelection(false);
+      
+      // Run the update with our prepared arrays
+      const { error: updateError } = await supabase
+        .from('battle_sessions')
+        .update({
+          ready_users: updatedReadyUsers,
+          topic_selections: updatedTopicSelections,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', 'default-battle-session');
+          
+      if (updateError) {
+        console.error(`Error updating session:`, updateError);
+        setDebugMsg('Error updating ready status');
+        return;
+      }
+      
+      console.log('User marked as ready:', user.email);
     } catch (error) {
       console.error('Error setting up readiness:', error);
       setDebugMsg('Error setting up ready status');
@@ -824,18 +890,29 @@ function merge(nums1, m, nums2, n) {
             <h3 className="text-lg font-medium text-white mb-2">Connected Warriors</h3>
             {connectedUsers.length > 0 ? (
               <ul className="text-left space-y-1 max-h-40 overflow-y-auto">
-                {connectedUsers.map((email, index) => (
-                  <li key={index} className="text-slate-300 flex items-center">
-                    <span className={`w-2 h-2 ${readyUsers.includes(email) ? 'bg-green-500' : 'bg-yellow-500'} rounded-full mr-2`}></span>
-                    {email}
-                    {email === user?.email && (
-                      <span className="ml-2 text-xs text-green-500">(you)</span>
-                    )}
-                    {readyUsers.includes(email) && (
-                      <span className="ml-2 text-xs text-green-500">Ready</span>
-                    )}
-                  </li>
-                ))}
+                {connectedUsers.map((email, index) => {
+                  // Here's the key fix: Never show a user as ready unless they've explicitly clicked the Ready button
+                  // Ignore any ready state from the database that wasn't explicitly set
+                  const isMyUserEmail = email === user?.email;
+                  const isUserReady = isMyUserEmail 
+                    ? isTopicSelectionComplete // Local state for current user
+                    : readyUsers.includes(email); // Database state for other users
+                  
+                  return (
+                    <li key={index} className="text-slate-300 flex items-center">
+                      <span className={`w-2 h-2 ${isUserReady ? 'bg-green-500' : 'bg-yellow-500'} rounded-full mr-2`}></span>
+                      {email}
+                      {isMyUserEmail && (
+                        <span className="ml-2 text-xs text-green-500">(you)</span>
+                      )}
+                      {isUserReady ? (
+                        <span className="ml-2 text-xs text-green-500">Ready</span>
+                      ) : (
+                        <span className="ml-2 text-xs text-yellow-500">Not Ready</span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="text-slate-400 text-sm">No warriors connected</p>
@@ -878,6 +955,50 @@ function merge(nums1, m, nums2, n) {
                       onClick={() => {
                         // Show topic selection again
                         setShowTopicSelection(true);
+                        
+                        // IMPORTANT: Set user as not ready when they change topics
+                        setIsTopicSelectionComplete(false);
+                        
+                        // Also remove user from ready list in database
+                        if (user?.email) {
+                          const removeFromReadyList = async () => {
+                            try {
+                              // First get current ready users
+                              const { data: session } = await supabase
+                                .from('battle_sessions')
+                                .select('ready_users')
+                                .eq('id', 'default-battle-session')
+                                .single();
+                                
+                              if (session && session.ready_users) {
+                                // Remove current user from the list
+                                const updatedReadyUsers = Array.isArray(session.ready_users)
+                                  ? session.ready_users.filter(email => email !== user.email)
+                                  : [];
+                                  
+                                // Update both local state and database
+                                setReadyUsers(updatedReadyUsers);
+                                
+                                // Update database
+                                await supabase
+                                  .from('battle_sessions')
+                                  .update({ 
+                                    ready_users: updatedReadyUsers,
+                                    updated_at: new Date().toISOString()
+                                  })
+                                  .eq('id', 'default-battle-session');
+                                  
+                                console.log('User marked as not ready after changing topics');
+                              }
+                            } catch (err) {
+                              console.error('Error updating ready status:', err);
+                            }
+                          };
+                          
+                          // Execute the update
+                          removeFromReadyList();
+                        }
+                        
                         setDebugMsg('Returned to topic selection');
                       }}
                     >
@@ -1638,6 +1759,7 @@ function merge(nums1, m, nums2, n) {
           setPlayerCount={setPlayerCount}
           setReadyUsers={setReadyUsers}
           setSelectedTopics={setSelectedTopics}
+          setTopicSelections={setTopicSelections}
         />
         
         {/* Celebration animation */}

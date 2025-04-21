@@ -134,89 +134,133 @@ class SubmissionService {
    * Adds a standard test runner to the code based on language
    */
   private addTestRunner(code: string, languageId: number): string {
-    // JavaScript (Node.js) test runner
+    // JavaScript test runner
     if (languageId === LANGUAGE_IDS.javascript) {
       return `
 ${code}
 
-// Standard test runner
-const runTests = async (userCode) => {
-  let input = '';
-  process.stdin.setEncoding('utf8');
+// Standard test runner for Judge0
+const readline = require('readline');
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+  terminal: false
+});
 
-  // Read all data from stdin asynchronously
-  for await (const chunk of process.stdin) {
-    input += chunk;
-  }
+// Get function name from the code
+const fnMatch = /function\\s+([a-zA-Z0-9_]+)\\s*\\(/.exec(${JSON.stringify(code)});
+const functionName = fnMatch ? fnMatch[1] : null;
 
-  if (!input) {
-      console.error(JSON.stringify({ error: "No input received via stdin" }));
-      return;
-  }
-  
+if (!functionName) {
+  console.log(JSON.stringify({
+    error: "Could not detect function name",
+    results: [],
+    summary: { total: 0, passed: 0 }
+  }));
+  process.exit(1);
+}
+
+// Count parameters in function definition
+const paramMatch = /function\\s+[a-zA-Z0-9_]+\\s*\\(([^)]*?)\\)/.exec(${JSON.stringify(code)});
+const paramCount = paramMatch ? paramMatch[1].split(',').filter(p => p.trim()).length : 0;
+
+// Process input
+let input = '';
+rl.on('line', (line) => {
+  input += line;
+});
+
+rl.on('close', () => {
   try {
-    // Parse test cases from input
+    // Parse the input data which contains test cases
     const testData = JSON.parse(input);
+    const results = [];
+    let directOutput = null;
     
-    // Determine function name by analyzing the code
-    const fnMatch = userCode.match(/function\\s+([a-zA-Z0-9_]+)\\s*\\(/);
-    const functionName = fnMatch ? fnMatch[1] : null;
+    // Check if we have a testCases array
+    const testCases = testData.testCases || [testData];
     
-    if (!functionName) {
-      console.error(JSON.stringify({ error: "Could not detect function name" }));
-      return;
-    }
-    
-    // Execute the test cases
-    const results = testData.testCases.map(test => {
+    // Process each test case
+    testCases.forEach((test, index) => {
       try {
-        // Parse args from test input
+        // Parse the input for this test case as an array of arguments
         const args = JSON.parse(test.input);
         
-        // Call the function with the test input
-        const result = Array.isArray(args) 
-          ? eval(functionName + '(' + args.map(JSON.stringify).join(',') + ')')
-          : eval(functionName + '(' + JSON.stringify(args) + ')');
+        // Call the function with the arguments
+        let result;
+        if (Array.isArray(args)) {
+          // Check if function expects a single array or multiple parameters
+          if (paramCount === 1) {
+            // Pass the array as a single parameter
+            result = eval(\`\${functionName}(\${JSON.stringify(args)})\`);
+          } else {
+            // If args is an array of arguments, spread them when calling the function
+            result = eval(\`\${functionName}(...\${JSON.stringify(args)})\`);
+          }
+        } else {
+          // If args is a single argument, call directly
+          result = eval(\`\${functionName}(\${JSON.stringify(args)})\`);
+        }
         
-        // Format result for comparison
-        const output = JSON.stringify(result);
+        // Format the result for output
+        let formattedResult;
+        if (result === null || result === undefined) {
+          formattedResult = "null";
+        } else if (typeof result === 'boolean') {
+          formattedResult = String(result).toLowerCase();
+        } else if (typeof result === 'number') {
+          formattedResult = String(result);
+        } else {
+          formattedResult = JSON.stringify(result);
+        }
         
-        // Instead of hardcoding for specific problems, properly handle output vs. expected field name difference
-        // The test case might have output field (from the JSON test files) but our test runner expects expected
-        const expected = test.expected !== undefined ? test.expected : 
-                         test.output !== undefined ? test.output : "undefined";
+        // Compare with expected result
+        const expected = test.expected || "";
+        const passed = formattedResult === expected;
         
-        return {
+        // Add to results array
+        results.push({
           input: test.input,
-          output: output,
+          output: formattedResult,
           expected: expected,
-          passed: output === expected
-        };
-      } catch (e) {
-        return {
+          passed: passed
+        });
+        
+        // Store first result for direct output (Judge0 will use this)
+        if (index === 0) {
+          directOutput = formattedResult;
+        }
+      } catch (error) {
+        results.push({
           input: test.input,
-          error: e.message,
+          output: "null",
+          error: error.message,
+          expected: test.expected || "",
           passed: false
-        };
+        });
       }
     });
     
-    // Output the results in JSON format
-    console.log(JSON.stringify({
-      results,
+    // Output a single JSON object with all results
+    const output = {
+      directOutput: directOutput,
+      results: results,
       summary: {
         total: results.length,
         passed: results.filter(r => r.passed).length
       }
+    };
+    
+    // Output the JSON result to stdout
+    console.log(JSON.stringify(output));
+  } catch (error) {
+    console.log(JSON.stringify({
+      error: error.message,
+      results: [],
+      summary: { total: 0, passed: 0 }
     }));
-  } catch (e) {
-    console.error(JSON.stringify({ error: e.message }));
   }
-};
-
-// Execute tests
-runTests(${JSON.stringify(code)});
-`;
+});`;
     }
     
     // Python test runner
@@ -224,70 +268,128 @@ runTests(${JSON.stringify(code)});
       return `
 ${code}
 
-# Standard test runner
+# Standard test runner for Judge0
 import sys
 import json
+import traceback
+import inspect
 
-def run_tests():
+def process_test_cases():
     try:
-        # Read input from stdin
+        # Read all input from stdin
         input_data = sys.stdin.read().strip()
+        
+        # Parse the input data 
         test_data = json.loads(input_data)
         
-        # Get the function name from the code
-        import re
-        fn_match = re.search(r'def\\s+([a-zA-Z0-9_]+)\\s*\\(', globals()['__code__'])
-        function_name = fn_match.group(1) if fn_match else None
+        # Find all user-defined functions
+        user_functions = [name for name, obj in globals().items() 
+                         if callable(obj) and not name.startswith('__') 
+                         and name != 'process_test_cases']
         
-        if not function_name or function_name not in globals():
-            print(json.dumps({"error": "Could not detect function"}))
+        # Find the main function - use the first user function
+        function_name = user_functions[0] if user_functions else None
+        
+        if not function_name:
+            print(json.dumps({
+                "error": "Could not detect function",
+                "results": [],
+                "summary": {"total": 0, "passed": 0}
+            }))
             return
-            
-        # Execute test cases
+        
+        func = globals()[function_name]
+        
+        # Check function signature to determine if it expects a single list or multiple args
+        # Get the number of required parameters
+        signature = inspect.signature(func)
+        param_count = sum(1 for p in signature.parameters.values() 
+                        if p.default == inspect.Parameter.empty and 
+                           p.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD)
+        
+        # Extract test cases
+        test_cases = test_data.get('testCases', [test_data])
+        
+        # Process each test case
         results = []
-        for test in test_data["testCases"]:
+        direct_output = None
+        
+        for i, test in enumerate(test_cases):
             try:
-                args = json.loads(test["input"])
-                func = globals()[function_name]
+                # Parse the input as an array of arguments
+                args = json.loads(test.get('input', '[]'))
                 
-                # Call the function with args
+                # Call the function with appropriate arguments
+                result = None
                 if isinstance(args, list):
-                    result = func(*args)
+                    # Check if function expects a single list or multiple arguments
+                    if param_count == 1:
+                        # Pass the entire list as a single argument
+                        result = func(args)
+                    else:
+                        # Unpack args as multiple arguments
+                        result = func(*args)
                 else:
+                    # Pass as single argument
                     result = func(args)
-                    
-                # Format output for comparison
-                output = json.dumps(result)
                 
+                # Format the result
+                if result is None:
+                    formatted_result = "null"
+                elif isinstance(result, bool):
+                    formatted_result = str(result).lower()
+                elif isinstance(result, (int, float)):
+                    formatted_result = str(result)
+                else:
+                    formatted_result = json.dumps(result)
+                
+                # Save the first result as direct output
+                if i == 0:
+                    direct_output = formatted_result
+                
+                # Get expected output
+                expected = test.get('expected', '')
+                passed = formatted_result == expected
+                
+                # Add to results
                 results.append({
-                    "input": test["input"],
-                    "output": output,
-                    "expected": test["expected"],
-                    "passed": output == test["expected"]
+                    "input": test.get('input', ''),
+                    "output": formatted_result,
+                    "expected": expected,
+                    "passed": passed
                 })
+                
             except Exception as e:
                 results.append({
-                    "input": test["input"],
+                    "input": test.get('input', ''),
+                    "output": "null",
                     "error": str(e),
+                    "expected": test.get('expected', ''),
                     "passed": False
                 })
-                
-        # Output results
-        print(json.dumps({
+        
+        # Format output
+        output = {
+            "directOutput": direct_output,
             "results": results,
             "summary": {
                 "total": len(results),
                 "passed": sum(1 for r in results if r.get("passed", False))
             }
-        }))
+        }
+        
+        # Output as JSON
+        print(json.dumps(output))
+        
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        print(json.dumps({
+            "error": str(e),
+            "results": [],
+            "summary": {"total": 0, "passed": 0}
+        }))
 
-# Save code for inspection
-globals()['__code__'] = '''${code}'''
-
-# Run tests
-run_tests()`;
+# Run the processing
+process_test_cases()`;
     }
     
     // For other languages, return the original code (placeholder for future implementations)
@@ -325,6 +427,9 @@ run_tests()`;
         }
         
         const data = await response.json();
+        
+        // Log raw response for debugging
+        console.log('Raw Judge0 response:', JSON.stringify(data, null, 2));
         
         // Check if processing is complete
         if (data.status.id !== 1 && data.status.id !== 2) {

@@ -355,42 +355,24 @@ export async function setupBattleSessionsTable(): Promise<{success: boolean, mes
   }
 }
 
-export async function checkTableExists(): Promise<boolean> {
+export async function checkTableExists(tableName: string): Promise<boolean> {
   try {
-    // First try a simple query to check if the table exists
-    const { error } = await supabase
-      .from('battle_sessions')
-      .select('count(*)', { count: 'exact', head: true });
-    
-    if (!error) {
-      console.log('Table exists and is accessible');
-      return true;
-    }
-    
-    console.log('Table check failed with error:', error);
-    
-    // If that fails, try a more direct approach using raw SQL query
-    // to check if the table exists in the database schema
-    const { data, error: sqlError } = await supabase.rpc('execute_sql', {
+    const { data, error } = await supabase.rpc('execute_sql', {
       sql_query: `
         SELECT EXISTS (
           SELECT FROM information_schema.tables 
-          WHERE table_schema = 'public'
-          AND table_name = 'battle_sessions'
+          WHERE table_schema = 'public' 
+          AND table_name = '${tableName}'
         );
       `
     });
     
-    if (sqlError) {
-      console.error('Error checking table existence with SQL:', sqlError);
-      if (sqlError.message.includes('execute_sql')) {
-        console.error('The execute_sql RPC function is not available. Please follow setup instructions.');
-      }
+    if (error) {
+      console.error('Error checking if table exists:', error);
       return false;
     }
     
-    console.log('SQL check result:', data);
-    return data && data.length > 0 && data[0].exists === true;
+    return data && data[0] && data[0].exists === true;
   } catch (error) {
     console.error('Error checking if table exists:', error);
     return false;
@@ -489,4 +471,64 @@ export async function setupCodingProblemsTable() {
     console.error('Error in setupCodingProblemsTable:', error);
     return { success: false, message: error.message };
   }
-} 
+}
+
+// Clean up stale ready states
+export const cleanupStaleReadyStates = async (): Promise<void> => {
+  try {
+    console.log('Cleaning up stale ready states...');
+    
+    // Get the current session
+    const { data: session, error } = await supabase
+      .from('battle_sessions')
+      .select('*')
+      .eq('id', 'default-battle-session')
+      .single();
+      
+    if (error) {
+      console.error('Error fetching session for cleanup:', error);
+      return;
+    }
+    
+    if (session) {
+      // If battle_state is topic_selection and ready_users has entries
+      // we might have stale ready users, especially if the application
+      // was closed unexpectedly
+      if (session.battle_state === 'topic_selection' && 
+          Array.isArray(session.ready_users) && 
+          session.ready_users.length > 0) {
+        
+        console.log('Found potentially stale ready states:', session.ready_users);
+        
+        // Verify readiness by checking topic_selections
+        const topicSelections = session.topic_selections || {};
+        const validReadyUsers = session.ready_users.filter((email: string) => 
+          topicSelections[email] && Array.isArray(topicSelections[email]) && 
+          topicSelections[email].length === 2
+        );
+        
+        // If any users were filtered out, update the database
+        if (validReadyUsers.length < session.ready_users.length) {
+          console.log('Removing stale ready users. Valid ready users:', validReadyUsers);
+          
+          // Update the session
+          await supabase
+            .from('battle_sessions')
+            .update({ 
+              ready_users: validReadyUsers,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', 'default-battle-session');
+            
+          console.log('Successfully cleaned up stale ready states');
+        } else {
+          console.log('No stale ready states found');
+        }
+      } else {
+        console.log('No cleanup needed: Either in battle or no ready users');
+      }
+    }
+  } catch (error) {
+    console.error('Error cleaning up stale ready states:', error);
+  }
+}; 

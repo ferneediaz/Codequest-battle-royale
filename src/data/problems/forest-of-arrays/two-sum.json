@@ -25,36 +25,36 @@
   ],
   "testCases": [
     {
-      "input": "[2,7,11,15], 9",
+      "input": "[[2,7,11,15], 9]",
       "output": "[0,1]",
       "isHidden": false
     },
     {
-      "input": "[3,2,4], 6",
+      "input": "[[3,2,4], 6]",
       "output": "[1,2]",
       "isHidden": false
     },
     {
-      "input": "[3,3], 6",
+      "input": "[[3,3], 6]",
       "output": "[0,1]",
       "isHidden": false
     },
     {
-      "input": "[1,2,3,4,5], 9",
+      "input": "[[1,2,3,4,5], 9]",
       "output": "[3,4]",
       "isHidden": false
     },
     {
-      "input": "[-1,-2,-3,-4,-5], -8",
+      "input": "[[-1,-2,-3,-4,-5], -8]",
       "output": "[2,4]",
       "isHidden": true
     },
     {
-      "input": "[0,4,3,0], 0",
+      "input": "[[0,4,3,0], 0]",
       "output": "[0,3]",
       "isHidden": true
     }
   ],
   "timeLimit": 1000,
   "memoryLimit": 128000
-} 
+}

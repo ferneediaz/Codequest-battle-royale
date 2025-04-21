@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { BattleCategory, BATTLE_CATEGORIES, CATEGORY_EMOJIS } from '../../constants/battleConstants';
 
@@ -40,12 +40,12 @@ const TopicSelection: React.FC<TopicSelectionProps> = ({
         ))}
       </div>
       
-      <div className="flex justify-center mt-6">
+      <div className="flex flex-col items-center justify-center mt-6">
         <Button
           disabled={selectedTopics.length !== 2}
           className={`px-8 py-3 rounded-lg shadow-lg flex items-center justify-center
             ${selectedTopics.length === 2
-              ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white'
+              ? 'bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white animate-pulse'
               : 'bg-gray-700 text-gray-400 cursor-not-allowed'}
           `}
           onClick={onCompleteSelection}

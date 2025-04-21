@@ -51,14 +51,23 @@ export const battleService = {
         connectedEmails.push(userEmail);
         console.log('Current connected users:', connectedEmails);
         
-        // Update session - IMPORTANT: Only update the connected_emails
-        // Do NOT update ready_users to prevent resetting ready status
+        // IMPORTANT: Always remove this user from ready_users when joining
+        // This ensures a user is only ready when they explicitly click the ready button
+        let readyUsers = Array.isArray(existingSession.ready_users) 
+          ? [...existingSession.ready_users]
+          : [];
+          
+        // Remove the joining user from ready_users
+        readyUsers = readyUsers.filter((email: string) => email !== userEmail);
+        console.log('Removed user from ready list on join:', userEmail);
+        
         const { data: updatedSession, error: updateError } = await supabase
           .from('battle_sessions')
           .update({ 
             active_users: connectedEmails.length,
-            connected_emails: connectedEmails
-            // Do not modify ready_users here
+            connected_emails: connectedEmails,
+            ready_users: readyUsers,
+            updated_at: new Date().toISOString()
           })
           .eq('id', DEFAULT_BATTLE_SESSION_ID)
           .select()
@@ -86,7 +95,10 @@ export const battleService = {
           round: 1,
           time_remaining: 300,
           current_category: 'Binary Search Castle',
-          connected_emails: initialEmails
+          connected_emails: initialEmails,
+          ready_users: [], // Initialize with empty ready_users array
+          battle_state: 'topic_selection',
+          updated_at: new Date().toISOString()
         })
         .select()
         .single();
