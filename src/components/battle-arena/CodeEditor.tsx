@@ -209,7 +209,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
                     expected: r.expected || formattedTestCases[index]?.expected || "true",
                     actual: r.output || "undefined",
                     index: testIndex,
-                    logs: allUserLogs // Directly use all logs
+                    logs: r.logs || [] // Use this test's own logs
                   };
                 });
                 
@@ -222,7 +222,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
                     expected: r.expected || formattedTestCases[index]?.expected || "true",
                     actual: r.output || r.expected || "true",
                     index: testIndex,
-                    logs: allUserLogs // Directly use all logs
+                    logs: r.logs || [] // Use this test's own logs
                   };
                 });
               

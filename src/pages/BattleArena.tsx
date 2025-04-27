@@ -653,7 +653,7 @@ function merge(nums1, m, nums2, n) {
                                       expected={test.expected}
                                       actual={test.actual}
                                       passed={true}
-                                      logs={testResults.userLogs ? [testResults.userLogs[i]] : []}
+                                      logs={test.logs || []}
                                     />
                                   ))}
                                   
@@ -665,7 +665,7 @@ function merge(nums1, m, nums2, n) {
                                       expected={test.expected} 
                                       actual={test.actual}
                                       passed={false}
-                                      logs={testResults.userLogs ? [testResults.userLogs[i + (testResults.passedTests?.length || 0)]] : []}
+                                      logs={test.logs || []}
                                     />
                                   ))}
                                 </div>
