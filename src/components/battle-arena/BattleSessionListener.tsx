@@ -116,15 +116,39 @@ const BattleSessionListener: React.FC<BattleSessionListenerProps> = ({
         }
       }
       
-      // Update selected topics if needed
+      // Update selected topics if needed, but be very cautious about overriding user selections
       if (setSelectedTopics && session.selected_topics) {
         const topics = Array.isArray(session.selected_topics) 
           ? session.selected_topics as BattleCategory[] 
           : [];
           
         if (topics.length > 0) {
-          console.log('🔄 Updating selected topics:', topics);
-          setSelectedTopics(topics);
+          console.log('🔄 Database has selected_topics:', topics);
+          // IMPORTANT: Don't override user's explicit selections from topic_selections
+          // Only use selected_topics as a fallback
+          const hasMadeExplicitSelection = userEmail && 
+                                          session.topic_selections && 
+                                          session.topic_selections[userEmail] &&
+                                          Array.isArray(session.topic_selections[userEmail]) &&
+                                          session.topic_selections[userEmail].length === 2;
+          
+          if (!hasMadeExplicitSelection) {
+            console.log('🔄 Using default selected_topics as user has no explicit selections');
+            setSelectedTopics(topics);
+          } else {
+            console.log('🔄 Keeping user\'s explicit topic selections instead of default');
+          }
+        }
+      }
+      
+      // Process user's explicit topic selections with highest priority
+      if (setSelectedTopics && userEmail && session.topic_selections && session.topic_selections[userEmail]) {
+        // Get the user's topic selections from the database
+        const userTopics = session.topic_selections[userEmail] as BattleCategory[];
+        if (Array.isArray(userTopics) && userTopics.length === 2) {
+          console.log('🔄 Setting topics to user\'s explicit selections from database:', userTopics);
+          // Apply the user's selections to local state
+          setSelectedTopics(userTopics);
         }
       }
     });
@@ -135,6 +159,90 @@ const BattleSessionListener: React.FC<BattleSessionListenerProps> = ({
       unsubscribe();
     };
   }, [userEmail, setConnectedUsers, setPlayerCount, setReadyUsers, setSelectedTopics, setTopicSelections]);
+  
+  // Add an additional effect to clean up stale users
+  useEffect(() => {
+    if (!userEmail) return;
+    
+    // Function to check for and remove stale users
+    const checkStaleUsers = async () => {
+      try {
+        // Get current session data
+        const { data: session, error } = await supabase
+          .from('battle_sessions')
+          .select('connected_emails, updated_at')
+          .eq('id', 'default-battle-session')
+          .single();
+          
+        if (error) {
+          console.error('Error fetching session for stale check:', error);
+          return;
+        }
+        
+        if (session) {
+          const emails = Array.isArray(session.connected_emails) 
+            ? session.connected_emails 
+            : [];
+            
+          // If we're not in the list but should be, add ourselves
+          if (!emails.includes(userEmail)) {
+            console.log('Re-adding ourselves to connected users list');
+            const updatedEmails = [...emails, userEmail];
+            
+            try {
+              await supabase
+                .from('battle_sessions')
+                .update({ 
+                  connected_emails: updatedEmails,
+                  active_users: updatedEmails.length,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', 'default-battle-session');
+                
+              console.log('Successfully re-added to user list');
+            } catch (err) {
+              console.error('Error re-adding to connected users:', err);
+            }
+          }
+          
+          // Check last update timestamp
+          const now = new Date();
+          const lastUpdate = session.updated_at 
+            ? new Date(session.updated_at) 
+            : now;
+          
+          // Calculate time difference in seconds
+          const timeDiff = (now.getTime() - lastUpdate.getTime()) / 1000;
+          
+          // If last activity was more than 60 seconds ago
+          // We need to refresh our data from the server
+          if (timeDiff > 60) {
+            console.log('Session inactive for over 60 seconds, refreshing data');
+            
+            // Refresh battle session data
+            try {
+              await battleService.syncUserCount();
+              console.log('Refreshed session data');
+            } catch (err) {
+              console.error('Error refreshing session data:', err);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error in stale user check:', err);
+      }
+    };
+    
+    // Run the check initially
+    checkStaleUsers();
+    
+    // Set up interval to check for stale users
+    const intervalId = setInterval(checkStaleUsers, 15000); // Every 15 seconds
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [userEmail]);
   
   // This component doesn't render anything
   return null;

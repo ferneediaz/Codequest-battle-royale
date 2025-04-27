@@ -7,6 +7,7 @@ import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
 import { Button } from '@/components/ui/button';
 import { submissionService } from '../services/submissionService';
+import ProblemDescription from './ProblemDescription';
 
 interface ProblemDisplayProps {
   problem: CodeProblem;
@@ -98,43 +99,59 @@ const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
     <div className="w-full">
       {/* Problem Header */}
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-bold text-white">{problem.title}</h2>
-        <Badge className={getDifficultyColor()}>
-          {problem.difficulty.toUpperCase()}
-        </Badge>
+        <h3 className="text-2xl font-bold">
+          {problem.id}. {problem.title} 
+          <span className={`ml-2 px-2 py-1 text-xs rounded-full ${problem.difficulty === 'Easy' ? 'bg-green-500/20 text-green-500' : problem.difficulty === 'Medium' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-red-500/20 text-red-500'}`}>
+            {problem.difficulty}
+          </span>
+        </h3>
+        
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            onClick={runTestCases}
+          >
+            Run Code
+          </Button>
+          <Button
+            onClick={handleSubmit}
+          >
+            Submit
+          </Button>
+        </div>
       </div>
 
       {/* Problem Description */}
       <Card className="bg-gray-800/50 p-4 mb-4">
         <div className="prose prose-invert max-w-none">
-          <div dangerouslySetInnerHTML={{ 
-            __html: problem.description.replace(/\n/g, '<br>').replace(/`([^`]+)`/g, '<code>$1</code>') 
-          }} />
+          <ProblemDescription description={problem.description} />
         </div>
 
         {/* Examples */}
         {problem.examples && problem.examples.length > 0 && (
           <div className="mt-4">
-            <h3 className="text-lg font-medium text-white mb-2">Examples</h3>
-            <div className="space-y-3">
-              {problem.examples.map((example, index) => (
-                <div key={index} className="bg-gray-900/50 p-3 rounded-md">
-                  <pre className="text-sm text-gray-300 whitespace-pre-wrap">{example}</pre>
+            <h4 className="text-xl font-semibold mb-2">Examples</h4>
+            {problem.examples.map((example: any, index: number) => (
+              <div key={index} className="mb-4 p-3 bg-gray-700/50 rounded-md">
+                <p className="font-medium">Example {index + 1}:</p>
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                  <div>
+                    <p className="text-gray-400">Input:</p>
+                    <pre className="bg-gray-900/50 p-2 rounded mt-1 overflow-x-auto">{example.input}</pre>
+                  </div>
+                  <div>
+                    <p className="text-gray-400">Output:</p>
+                    <pre className="bg-gray-900/50 p-2 rounded mt-1 overflow-x-auto">{example.output}</pre>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Constraints */}
-        {problem.constraints && problem.constraints.length > 0 && (
-          <div className="mt-4">
-            <h3 className="text-lg font-medium text-white mb-2">Constraints</h3>
-            <ul className="list-disc pl-5 space-y-1">
-              {problem.constraints.map((constraint, index) => (
-                <li key={index} className="text-sm text-gray-300">{constraint}</li>
-              ))}
-            </ul>
+                {example.explanation && (
+                  <div className="mt-2">
+                    <p className="text-gray-400">Explanation:</p>
+                    <p className="mt-1">{example.explanation}</p>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </Card>

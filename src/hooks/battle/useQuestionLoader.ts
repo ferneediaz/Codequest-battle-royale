@@ -21,21 +21,36 @@ export const useQuestionLoader = () => {
     setLoading(true);
     await initialize();
     
+    console.log('Loading problems for selected categories:', categories);
+    
     const loadedProblems: Record<BattleCategory, CodeProblem[]> = {} as Record<BattleCategory, CodeProblem[]>;
     
     for (const category of categories) {
       loadedProblems[category] = activeProblemService.getProblemsByCategory(category);
+      console.log(`Loaded ${loadedProblems[category].length} problems for "${category}"`);
     }
     
     setProblems(loadedProblems);
     setLoading(false);
     
+    // Log a summary of all loaded problems
+    const allProblemsCount = Object.values(loadedProblems).reduce((total, problems) => total + problems.length, 0);
+    console.log(`Total problems loaded: ${allProblemsCount}`);
+    
     return loadedProblems;
   }, [initialize]);
   
   const getRandomProblem = useCallback((category: BattleCategory, difficulty?: 'easy' | 'medium' | 'hard') => {
+    console.log(`Getting random problem for category: ${category}${difficulty ? `, difficulty: ${difficulty}` : ''}`);
     const categoryProblems = activeProblemService.getRandomProblemsByCategory(category, 1, difficulty);
     const problem = categoryProblems.length > 0 ? categoryProblems[0] : null;
+    
+    if (problem) {
+      console.log(`Selected random problem: ${problem.id} - ${problem.title}`);
+    } else {
+      console.warn(`No problems found for category: ${category}`);
+    }
+    
     setCurrentProblem(problem);
     return problem;
   }, []);

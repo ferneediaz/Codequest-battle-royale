@@ -101,6 +101,7 @@ class ProblemService {
       try {
         // Using dynamic import to load the problem files
         const categorySlug = getCategorySlug(category);
+        console.log(`Loading problems for category: ${category} (slug: ${categorySlug})`);
         
         // Load problems from each category
         if (categorySlug === 'forest-of-arrays') {
@@ -252,7 +253,7 @@ class ProblemService {
             };
             this.problems.push(problem);
           } catch (e) {
-            console.warn('Could not load invert-binary-tree.json');
+            console.warn('Could not load invert-binary-tree.json:', e);
           }
         }
         
@@ -265,7 +266,7 @@ class ProblemService {
             };
             this.problems.push(problem);
           } catch (e) {
-            console.warn('Could not load reverse-linked-list.json');
+            console.warn('Could not load reverse-linked-list.json:', e);
           }
         }
         
@@ -278,7 +279,7 @@ class ProblemService {
             };
             this.problems.push(problem);
           } catch (e) {
-            console.warn('Could not load number-of-islands.json');
+            console.warn('Could not load number-of-islands.json:', e);
           }
         }
         
@@ -286,12 +287,13 @@ class ProblemService {
         // const problems = await import(`../data/problems/${categorySlug}.json`);
         // this.problems.push(...problems.default);
         
-      } catch (error) {
-        console.error(`Failed to load problems for category: ${category}`, error);
+      } catch (e) {
+        console.error(`Error loading problems for category ${category}:`, e);
       }
     }
     
-    console.log(`Loaded ${this.problems.length} problems from local files`);
+    console.log(`Loaded ${this.problems.length} problems from local files with categories:`, 
+      [...new Set(this.problems.map(p => p.category))]);
   }
   
   // Upload problems to Supabase (for persistence)
@@ -327,7 +329,15 @@ class ProblemService {
   
   // Get all problems for a specific category
   getProblemsByCategory(category: string): CodeProblem[] {
-    return this.problemsByCategory[category] || [];
+    console.log(`Looking up problems for category: "${category}"`);
+    
+    // Get problems for this category
+    const categoryProblems = this.problemsByCategory[category] || [];
+    
+    console.log(`Found ${categoryProblems.length} problems for "${category}"`, 
+                categoryProblems.map(p => p.title));
+    
+    return categoryProblems;
   }
   
   // Get random problems from a category with optional difficulty filter

@@ -12,6 +12,7 @@ export interface TestResultItemDetails {
   expected: string;
   actual: string;
   index: number;
+  logs?: string[];
 }
 
 export interface TestResults {
@@ -19,6 +20,7 @@ export interface TestResults {
   total: number;
   failedTests?: TestResultItemDetails[];
   passedTests?: TestResultItemDetails[];
+  userLogs?: string[];
 }
 
 interface CodeEditorProps {
@@ -26,7 +28,7 @@ interface CodeEditorProps {
   setUserCode: (code: string) => void;
   selectedLanguage: string;
   setSelectedLanguage: (language: string) => void;
-  timeRemaining: number;
+  timeRemaining: string;
   editorFrozen: boolean;
   editorFrozenEndTime: number | null;
   isQuestionSelected: boolean;
@@ -78,9 +80,62 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
       }));
 
       console.log('Run Tests - using visibleTests:', formattedTestCases);
+      
+      // Check if user's code already has console.log/print statements
+      const hasConsoleLog = selectedLanguage === 'javascript' && 
+        userCode.includes('console.log');
+      const hasPrint = selectedLanguage === 'python' && 
+        userCode.includes('print');
+      
+      // Only inject debug logs if user doesn't have their own
+      let submissionCode = userCode;
+      if (!hasConsoleLog && !hasPrint) {
+        // For JavaScript, add debug log at start of function
+        if (selectedLanguage === 'javascript') {
+          // Extract function declaration
+          const functionMatch = userCode.match(/(function\s+\w+\s*\([^)]*\)\s*{)/);
+          if (functionMatch) {
+            const functionDeclaration = functionMatch[1];
+            const insertionPoint = userCode.indexOf(functionDeclaration) + functionDeclaration.length;
+            
+            // Insert console.log after function opening brace with input details
+            submissionCode = [
+              userCode.slice(0, insertionPoint),
+              '\n  console.log("Function called with input:", ...arguments);\n',
+              userCode.slice(insertionPoint)
+            ].join('');
+          }
+        } 
+        // For Python, insert print statement 
+        else if (selectedLanguage === 'python') {
+          const functionMatch = userCode.match(/(def\s+\w+\s*\([^)]*\)\s*:)/);
+          if (functionMatch) {
+            const functionDeclaration = functionMatch[1];
+            const insertionPoint = userCode.indexOf(functionDeclaration) + functionDeclaration.length;
+            
+            // Get parameter names from function declaration
+            const paramMatch = functionDeclaration.match(/\(([^)]*)\)/);
+            const params = paramMatch ? paramMatch[1].split(',').map(p => p.trim()) : [];
+            
+            // Create a print statement that shows parameters
+            const printStmt = params.length > 0
+              ? `\n    print("Function called with: " + ", ".join([f"{param}={{{param}}}" for param in [${params.join(', ')}]]))\n`
+              : '\n    print("Function called")\n';
+              
+            // Insert print after function declaration
+            submissionCode = [
+              userCode.slice(0, insertionPoint),
+              printStmt,
+              userCode.slice(insertionPoint)
+            ].join('');
+          }
+        }
+      }
+      
+      console.log('Submitted code:', submissionCode);
 
       const submissionPayload = {
-        source_code: userCode,
+        source_code: submissionCode,
         language_id: languageId,
         stdin: JSON.stringify({ testCases: formattedTestCases }), // Pass tests via stdin
       };
@@ -95,33 +150,92 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
         // If accepted, parse the stdout which contains our test runner JSON output
         if (result.stdout) {
           try {
-            const runnerOutput = JSON.parse(result.stdout);
-            if (runnerOutput.summary && runnerOutput.results) {
-              // Separate passed and failed tests from runner output
-              const failed = runnerOutput.results
-                .filter((r: any) => !r.passed)
-                .map((r: any, index: number): TestResultItemDetails => ({ 
-                  input: r.input || formattedTestCases[index]?.input || `Test case ${index + 1}`,
-                  expected: r.expected || formattedTestCases[index]?.expected || "true",
-                  actual: r.output || "undefined",
-                  index: index + 1 // Use 1-based index for display
-                }));
+            // Handle potential stdout with debug logs
+            let jsonOutput = result.stdout;
+            let userConsoleLogs: string[] = [];
+            
+            // First attempt to extract user logs from stderr which is more reliable 
+            if (result.stderr) {
+              const stderrLines = result.stderr.split('\n');
+              const logLines = stderrLines
+                .filter(line => line.includes('USER LOG:'))
+                .map(line => line.replace('USER LOG:', '').trim());
+              
+              if (logLines.length > 0) {
+                console.log('Found logs in stderr:', logLines);
+                userConsoleLogs = logLines;
+              }
+            }
+            
+            // Find JSON part in stdout
+            const jsonStartIndex = result.stdout.indexOf('{');
+            if (jsonStartIndex !== -1) {
+              jsonOutput = result.stdout.substring(jsonStartIndex);
+              
+              // Also collect any logs from before the JSON
+              if (jsonStartIndex > 0) {
+                const preJsonLogs = result.stdout.substring(0, jsonStartIndex)
+                  .split('\n')
+                  .filter(line => line.trim() !== '');
                 
-              const passed = runnerOutput.results
+                if (preJsonLogs.length > 0) {
+                  userConsoleLogs = [...userConsoleLogs, ...preJsonLogs];
+                }
+              }
+            }
+            
+            // Parse JSON output
+            const runnerOutput = JSON.parse(jsonOutput);
+            
+            if (runnerOutput.summary && runnerOutput.results) {
+              // Log the entire runnerOutput to inspect all properties
+              console.log("FULL RUNNER OUTPUT:", JSON.stringify(runnerOutput, null, 2));
+              
+              // Get logs from both explicit userLogs and from our extraction
+              const allUserLogs = [
+                ...userConsoleLogs,
+                ...(runnerOutput.userLogs || [])
+              ].filter(log => log.trim() !== ''); // Remove empty lines
+              
+              console.log('Final combined logs:', allUserLogs);
+              
+              // Simple direct assignment of logs to tests
+              const failedTests = runnerOutput.results
+                .filter((r: any) => !r.passed)
+                .map((r: any, index: number): TestResultItemDetails => {
+                  const testIndex = index + 1; 
+                  return {
+                    input: r.input || formattedTestCases[index]?.input || `Test case ${testIndex}`,
+                    expected: r.expected || formattedTestCases[index]?.expected || "true",
+                    actual: r.output || "undefined",
+                    index: testIndex,
+                    logs: allUserLogs // Directly use all logs
+                  };
+                });
+                
+              const passedTests = runnerOutput.results
                 .filter((r: any) => r.passed)
-                .map((r: any, index: number): TestResultItemDetails => ({ 
-                  input: r.input || formattedTestCases[index]?.input || `Test case ${index + 1}`, 
-                  expected: r.expected || formattedTestCases[index]?.expected || "true", 
-                  actual: r.output || r.expected || "true", 
-                  index: index + 1 // Use 1-based index for display
-                }));
-
+                .map((r: any, index: number): TestResultItemDetails => {
+                  const testIndex = index + 1;
+                  return {
+                    input: r.input || formattedTestCases[index]?.input || `Test case ${testIndex}`,
+                    expected: r.expected || formattedTestCases[index]?.expected || "true",
+                    actual: r.output || r.expected || "true",
+                    index: testIndex,
+                    logs: allUserLogs // Directly use all logs
+                  };
+                });
+              
               testResults = {
                 passed: runnerOutput.summary.passed,
                 total: runnerOutput.summary.total,
-                failedTests: failed,
-                passedTests: passed // Include passed tests details
+                failedTests: failedTests,
+                passedTests: passedTests,
+                userLogs: allUserLogs
               };
+              
+              // Debug logging to verify userLogs are captured
+              console.log('Final logs to be displayed:', testResults.userLogs);
               
               // Ensure we have input and expected values for every test case
               if (testResults.failedTests) {
@@ -138,7 +252,51 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
               throw new Error('Test runner output format invalid');
             }
           } catch (parseError) {
+            // Handle parsing error but still try to extract any logs
             console.error('Error parsing test runner output:', parseError, result.stdout);
+            
+            // Try to extract user logs even if JSON parsing failed
+            let userLogs: string[] = ['[Error processing console logs - see actual logs below]'];
+            
+            // Check for logs in stdout
+            if (result.stdout) {
+              const stdoutLines = result.stdout.split('\n');
+              const stdoutLogs = stdoutLines.filter(line => 
+                line.trim() !== '' && 
+                !line.startsWith('{') && 
+                !line.startsWith('}')
+              );
+              if (stdoutLogs.length > 0) {
+                userLogs = [...userLogs, ...stdoutLogs];
+              }
+            }
+            
+            // Check for logs in stderr
+            if (result.stderr) {
+              const stderrLines = result.stderr.split('\n');
+              const userLogLines = stderrLines
+                .filter(line => line.includes('USER LOG:'))
+                .map(line => line.replace('USER LOG:', '').trim());
+              
+              if (userLogLines.length > 0) {
+                userLogs = [...userLogs, ...userLogLines];
+              }
+            }
+            
+            // Create basic test results with the logs we found
+            testResults = {
+              passed: 0,
+              total: visibleTests.length,
+              failedTests: visibleTests.map((test, i) => ({
+                input: test.input,
+                expected: test.output,
+                actual: "Error running test",
+                index: i + 1,
+                logs: userLogs // Add logs to each test for visibility
+              })),
+              userLogs
+            };
+            
             setDebugMsg('Error processing test results.');
           }
         } else {
@@ -175,7 +333,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
             <option value="python">Python</option>
           </select>
         </div>
-        <span className="text-gray-500">Time: {formatTime(timeRemaining)}</span>
+        <span className="text-gray-500">Time: {timeRemaining}</span>
       </div>
       
       <div className="relative">

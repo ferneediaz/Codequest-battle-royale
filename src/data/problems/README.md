@@ -45,12 +45,12 @@ Each problem JSON file must follow this schema:
   ],
   "testCases": [
     {
-      "input": "Input for test case 1",
+      "input": "[parameter1, parameter2]",
       "output": "Expected output for test case 1",
       "isHidden": false
     },
     {
-      "input": "Input for test case 2",
+      "input": "[parameter1, parameter2]",
       "output": "Expected output for test case 2",
       "isHidden": true
     }
@@ -83,13 +83,45 @@ Each test case has this structure:
 
 ```json
 {
-  "input": "Input string in the format expected by the solution function",
+  "input": "[<parameter1>, <parameter2>, ...]",
   "output": "Expected output string that will be compared against the solution's output",
   "isHidden": boolean
 }
 ```
 
-- `input`: String representation of input parameters. For multiple parameters, use comma-separated values.
+### IMPORTANT: Proper Input Format for Judge0 Compatibility
+
+The `input` field MUST be a valid JSON array string. The format varies by parameter types:
+
+1. **For functions with multiple parameters:**
+   ```json
+   "input": "[[1,2,3,4], 3]"
+   ```
+   This represents a function call like `search([1,2,3,4], 3)`
+
+2. **For array inputs:**
+   ```json
+   "input": "[1,2,3,4]"
+   ```
+
+3. **For linked list problems:**
+   ```json
+   "input": "[1,2,3,4,5]"
+   ```
+   This will be converted to a linked list structure automatically
+
+4. **For binary tree problems:**
+   ```json
+   "input": "[1,2,3,null,null,4,5]"
+   ```
+   This will be converted to a tree structure automatically
+
+**DO NOT use comma-separated values outside of a JSON array**. For example:
+- ❌ Incorrect: `"input": "[1,2,3], 4"`
+- ✅ Correct: `"input": "[[1,2,3], 4]"`
+
+This ensures proper parsing by the Judge0 test runner in submissionService.ts.
+
 - `output`: Expected output as a string. Must match the solution's output exactly.
 - `isHidden`: If true, this test case is used for validation but not shown to users.
 
@@ -97,10 +129,10 @@ Each test case has this structure:
 
 For proper integration with Judge0:
 
-1. Ensure inputs and outputs are consistently formatted as strings.
+1. Ensure inputs and outputs are consistently formatted as valid JSON strings.
 2. JavaScript function should return the result rather than just printing it.
 3. Python functions should return the result as well.
-4. Test case inputs should match the parameter format of the solution function.
+4. Test case inputs must be proper JSON arrays that match the parameter format expected by the solution function.
 5. Test case outputs must match the expected return value format exactly.
 
 ## Adding New Problems
@@ -109,12 +141,14 @@ To add a new problem:
 
 1. Create a JSON file in the appropriate category folder.
 2. Follow the schema defined above.
-3. Run the standardization script: `npm run standardize-problems`
-4. Run the reload script to update the database: `npm run reload-problems`
+3. Ensure all test case inputs are properly formatted as JSON arrays.
+4. Run the standardization script: `npm run standardize-problems`
+5. Run the reload script to update the database: `npm run reload-problems`
 
 ## Test Case Best Practices
 
 1. Include basic test cases visible to users (isHidden: false).
 2. Include edge cases as hidden tests (isHidden: true).
 3. Test both valid and invalid inputs.
-4. Ensure output formats are consistent (e.g., array representations). 
+4. Ensure output formats are consistent (e.g., array representations).
+5. Verify all test cases work with the Judge0 test runner before deploying. 

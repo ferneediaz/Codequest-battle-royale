@@ -11,7 +11,9 @@
     "setup-coding-problems": "node src/scripts/setupCodingProblemsTable.js",
     "populate-problems": "node src/scripts/directPopulate.js",
     "reload-problems": "node src/scripts/reloadProblems.js",
-    "standardize-problems": "node src/scripts/standardizeProblems.js"
+    "standardize-problems": "node src/scripts/standardizeProblems.js",
+    "standardize-test-cases": "node scripts/standardize-test-cases.js",
+    "fix-test-case-formats": "node src/scripts/fixTestCaseFormat.js"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.3",

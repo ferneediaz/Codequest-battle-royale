@@ -4,7 +4,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CodeProblem } from '../../services/problemService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronDown, ChevronRight, CheckCircle } from 'lucide-react';
+import { CheckCircle, Terminal } from 'lucide-react';
+import UserLogs from './UserLogs';
+import TestResultItem, { TestResultItemDetails } from './TestResultItem';
 
 interface ProblemDisplayProps {
   currentQuestion: CodeProblem | null;
@@ -17,58 +19,20 @@ interface ProblemDisplayProps {
       expected: string;
       actual: string;
       index: number;
+      logs?: string[];
     }>;
+    passedTests?: Array<{
+      input: string;
+      expected: string;
+      actual: string; 
+      index: number;
+      logs?: string[];
+    }>;
+    userLogs?: string[];
   } | null;
   isTestRunning?: boolean;
   hideInstructions?: boolean;
 }
-
-// Expandable test result component
-const TestResultItem = ({ index, input, expected, actual, passed }: { 
-  index: number; 
-  input: string; 
-  expected: string; 
-  actual: string; 
-  passed: boolean;
-}) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  
-  return (
-    <div className={`border-b border-gray-700 py-2`}>
-      <div 
-        className="flex items-center cursor-pointer" 
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        {isExpanded ? 
-          <ChevronDown className="w-4 h-4 mr-2 text-gray-400" /> : 
-          <ChevronRight className="w-4 h-4 mr-2 text-gray-400" />
-        }
-        <div className={`font-mono ${passed ? 'text-green-300' : 'text-red-300'} flex-1`}>
-          {passed ? '✓' : '✗'} Test #{index}
-        </div>
-      </div>
-      
-      {isExpanded && (
-        <div className="pl-6 mt-2 space-y-1">
-          <div className="grid grid-cols-[80px_1fr] gap-1 text-sm">
-            <div className="text-gray-400">Input:</div>
-            <div className="text-gray-100 overflow-x-auto whitespace-pre font-mono">{input}</div>
-            
-            <div className="text-gray-400">Expected:</div>
-            <div className={`${passed ? 'text-green-300' : 'text-green-300'} overflow-x-auto whitespace-pre font-mono`}>{expected}</div>
-            
-            {!passed && (
-              <>
-                <div className="text-gray-400">Your Output:</div>
-                <div className="text-red-300 overflow-x-auto whitespace-pre font-mono">{actual}</div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
 
 const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
   currentQuestion,
@@ -79,12 +43,33 @@ const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<string>(hideInstructions ? "output" : "instructions");
   
+  // Debug testResults to see what's coming in
+  React.useEffect(() => {
+    if (testResults) {
+      console.log("ProblemDisplay received testResults:", {
+        passed: testResults.passed,
+        total: testResults.total,
+        failedTestsCount: testResults.failedTests?.length || 0,
+        userLogsExist: !!testResults.userLogs,
+        userLogsCount: testResults.userLogs?.length || 0,
+        userLogsSample: testResults.userLogs?.slice(0, 3) || []
+      });
+    }
+  }, [testResults]);
+  
   // Switch to test results tab when tests are run
   React.useEffect(() => {
     if (testResults && !hideInstructions) {
       setActiveTab("output");
     }
   }, [testResults, hideInstructions]);
+
+  // Modify this section to directly show the user logs in the UI
+  React.useEffect(() => {
+    if (testResults && testResults.userLogs && testResults.userLogs.length > 0) {
+      console.log('User logs detected in ProblemDisplay:', testResults.userLogs);
+    }
+  }, [testResults]);
 
   // Get test cases from the currentQuestion to show real input/output
   const testCasesWithOutput = React.useMemo(() => {
@@ -104,11 +89,53 @@ const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
       // Get visible test cases (non-hidden)
       const visibleTests = currentQuestion.testCases.filter(test => !test.isHidden);
       
+      console.log('Processing test results for test cases:', visibleTests.length);
+      console.log('testResults object structure:', {
+        passed: testResults.passed,
+        total: testResults.total,
+        failedTestsCount: testResults.failedTests?.length || 0,
+        passedTestsCount: testResults.passedTests?.length || 0,
+        userLogsCount: testResults.userLogs?.length || 0
+      });
+      
+      if (testResults.failedTests) {
+        console.log('Failed tests logs info:', testResults.failedTests.map(t => ({
+          index: t.index,
+          hasLogs: !!t.logs,
+          logsCount: t.logs?.length || 0
+        })));
+      }
+      
+      if (testResults.passedTests) {
+        console.log('Passed tests logs info:', testResults.passedTests.map(t => ({
+          index: t.index,
+          hasLogs: !!t.logs,
+          logsCount: t.logs?.length || 0
+        })));
+      }
+      
       // Match them with results by index
       for (let i = 0; i < visibleTests.length; i++) {
         const testIndex = i + 1; // Assuming test indexes start at 1
         const testCase = visibleTests[i];
         const failedTestData = failedTestsMap[testIndex];
+        
+        // Use correct logs for this specific test case rather than all logs
+        // Look for logs in failedTestData first, if not found fallback to empty array
+        let testLogs = [];
+        
+        if (failedTestData && failedTestData.logs && failedTestData.logs.length > 0) {
+          // Use the logs assigned to this specific test case in failedTestData
+          testLogs = failedTestData.logs;
+        } else if (testResults.passedTests) {
+          // Look for logs in passedTests as well
+          const matchingPassedTest = testResults.passedTests.find((t: { index: number }) => t.index === testIndex);
+          if (matchingPassedTest && matchingPassedTest.logs && matchingPassedTest.logs.length > 0) {
+            testLogs = matchingPassedTest.logs;
+          }
+        }
+        
+        console.log(`Test ${testIndex} has ${testLogs.length} logs`);
         
         if (failedTestData) {
           // This is a failed test
@@ -117,7 +144,8 @@ const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
             input: testCase.input,
             expected: testCase.output,
             actual: failedTestData.actual,
-            passed: false
+            passed: false,
+            logs: testLogs // Use only logs for this specific test
           });
         } else {
           // This is a passed test
@@ -126,7 +154,8 @@ const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
             input: testCase.input,
             expected: testCase.output,
             actual: testCase.output, // For passed tests, actual equals expected
-            passed: true
+            passed: true,
+            logs: testLogs // Use only logs for this specific test
           });
         }
       }
@@ -134,6 +163,36 @@ const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
     
     return allTests;
   }, [testResults, currentQuestion]);
+
+  // Helper function to render userLogs
+  const renderUserLogs = () => {
+    if (!testResults || !testResults.userLogs || testResults.userLogs.length === 0) {
+      return (
+        <div className="mb-4 bg-gray-800 p-4 rounded-md border border-gray-700">
+          <div className="text-gray-400 text-sm">No console logs to display. Add console.log() statements to your code to see output here.</div>
+        </div>
+      );
+    }
+    
+    // Show logs with more visible styling
+    return (
+      <div className="mb-4">
+        <h3 className="text-lg font-medium text-white mb-2 flex items-center">
+          <Terminal className="w-5 h-5 mr-2 text-gray-400" />
+          Console Output:
+        </h3>
+        <div className="bg-gray-900 rounded-md border-2 border-gray-700 p-3 overflow-x-auto user-logs-content">
+          <pre className="text-sm text-white font-mono whitespace-pre-wrap">
+            {testResults.userLogs.map((log, index) => (
+              <div key={index} className="py-1">
+                {log}
+              </div>
+            ))}
+          </pre>
+        </div>
+      </div>
+    );
+  };
 
   // If hideInstructions is true, just render the output tab content
   if (hideInstructions) {
@@ -163,18 +222,31 @@ const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
               <h3 className="text-lg font-medium text-white mb-2">Test Results:</h3>
               
               <div className="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
-                {testCasesWithOutput.map((test) => (
-                  <TestResultItem 
-                    key={test.index} 
-                    index={test.index} 
-                    input={test.input} 
-                    expected={test.expected} 
-                    actual={test.actual}
-                    passed={test.passed}
-                  />
-                ))}
+                {testCasesWithOutput.map((test) => {
+                  // Force log debugging right before rendering
+                  console.log(`TEST RENDERING ${test.index}:`, {
+                    hasLogs: test.logs && test.logs.length > 0,
+                    logCount: test.logs?.length || 0,
+                    actualLogs: test.logs || []
+                  });
+                  
+                  return (
+                    <TestResultItem 
+                      key={test.index} 
+                      index={test.index} 
+                      input={test.input} 
+                      expected={test.expected} 
+                      actual={test.actual}
+                      passed={test.passed}
+                      logs={test.logs || []}
+                    />
+                  );
+                })}
               </div>
             </div>
+            
+            {/* Console Output section - using our enhanced helper function */}
+            {renderUserLogs()}
             
             {/* Success message */}
             {testResults.passed === testResults.total && (
@@ -293,6 +365,18 @@ const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
               </ul>
             </div>
           )}
+          
+          {currentQuestion && (
+            <div className="mt-4">
+              <Button
+                onClick={onBackToList}
+                variant="outline"
+                className="text-white"
+              >
+                ← Back to Problem List
+              </Button>
+            </div>
+          )}
         </TabsContent>
         
         <TabsContent value="output" className="border-none p-0">
@@ -301,62 +385,74 @@ const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
               <span className="ml-3 text-white">Running tests...</span>
             </div>
-          ) : testResults ? (
-            <div>
-              {/* Header showing passed/failed counts */}
-              <div className="mb-4 p-3 bg-gray-900/60 text-sm">
-                <div className="flex justify-between">
-                  <div>Time: 456ms</div>
-                  <div>
-                    <span className="text-green-400">Passed: {testResults.passed}</span> 
-                    <span className="mx-2">|</span> 
-                    <span className="text-red-400">Failed: {testResults.total - testResults.passed}</span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Test Results section */}
-              <div className="mb-4">
-                <h3 className="text-lg font-medium text-white mb-2">Test Results:</h3>
-                
-                <div className="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
-                  {testCasesWithOutput.map((test) => (
-                    <TestResultItem 
-                      key={test.index} 
-                      index={test.index} 
-                      input={test.input} 
-                      expected={test.expected} 
-                      actual={test.actual}
-                      passed={test.passed}
-                    />
-                  ))}
-                </div>
-              </div>
-              
-              {/* Success message */}
-              {testResults.passed === testResults.total && (
-                <div className="my-8 p-4 bg-gray-900 border-l-4 border-green-500 text-center">
-                  <div className="text-green-400 font-medium flex items-center justify-center">
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    You have passed all of the tests! :)
-                  </div>
-                </div>
-              )}
-              
-              <div className="mt-4 text-center">
-                <Button 
-                  variant="outline" 
-                  className="border-gray-600 text-gray-300 hover:bg-gray-700/50"
-                  onClick={() => setActiveTab("instructions")}
-                >
-                  Back to Instructions
-                </Button>
-              </div>
-            </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-40 text-gray-400">
-              <p>No test results yet</p>
-              <p className="text-sm mt-2">Run tests to see results here</p>
+            testResults && (
+              <>
+                {/* Header showing passed/failed counts */}
+                <div className="mb-4 p-3 bg-gray-900/60 text-sm">
+                  <div className="flex justify-between">
+                    <div>Time: 456ms</div>
+                    <div>
+                      <span className="text-green-400">Passed: {testResults.passed}</span> 
+                      <span className="mx-2">|</span> 
+                      <span className="text-red-400">Failed: {testResults.total - testResults.passed}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Test Results section */}
+                <div className="mb-4">
+                  <h3 className="text-lg font-medium text-white mb-2">Test Results:</h3>
+                  
+                  <div className="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
+                    {testCasesWithOutput.map((test) => {
+                      // Force log debugging right before rendering
+                      console.log(`TEST RENDERING ${test.index}:`, {
+                        hasLogs: test.logs && test.logs.length > 0,
+                        logCount: test.logs?.length || 0,
+                        actualLogs: test.logs || []
+                      });
+                      
+                      return (
+                        <TestResultItem 
+                          key={test.index} 
+                          index={test.index} 
+                          input={test.input} 
+                          expected={test.expected} 
+                          actual={test.actual}
+                          passed={test.passed}
+                          logs={test.logs || []}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {/* Console Output section - using our enhanced helper function */}
+                {renderUserLogs()}
+                
+                {/* Success message */}
+                {testResults.passed === testResults.total && (
+                  <div className="my-8 p-4 bg-gray-900 border-l-4 border-green-500 text-center">
+                    <div className="text-green-400 font-medium flex items-center justify-center">
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      You have passed all of the tests! :)
+                    </div>
+                  </div>
+                )}
+              </>
+            )
+          )}
+          
+          {currentQuestion && (
+            <div className="mt-4">
+              <Button
+                onClick={onBackToList}
+                variant="outline"
+                className="text-white"
+              >
+                ← Back to Problem List
+              </Button>
             </div>
           )}
         </TabsContent>

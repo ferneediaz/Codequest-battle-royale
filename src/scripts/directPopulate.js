@@ -77,6 +77,29 @@ async function loadProblems() {
         try {
           const fileContent = fs.readFileSync(filePath, 'utf8');
           const problem = JSON.parse(fileContent);
+          
+          // Validate test case formats
+          if (problem.testCases && Array.isArray(problem.testCases)) {
+            console.log(`Validating test cases for problem: ${problem.id}`);
+            for (const testCase of problem.testCases) {
+              // Check if input is in the right format for multiple parameter problems
+              const isBinarySearch = problem.id.includes('search') || 
+                                   (problem.description && problem.description.toLowerCase().includes('search'));
+              
+              if (isBinarySearch && testCase.input) {
+                // Detect old format "[array], value" and fix it
+                const legacyMatch = testCase.input.match(/^\[(.*)\],\s*(.*)$/);
+                if (legacyMatch && !testCase.input.startsWith('[[')) {
+                  const oldInput = testCase.input;
+                  testCase.input = `[[${legacyMatch[1]}], ${legacyMatch[2]}]`;
+                  console.log(`Fixed test case format for ${problem.id}:`);
+                  console.log(`  Old: ${oldInput}`);
+                  console.log(`  New: ${testCase.input}`);
+                }
+              }
+            }
+          }
+          
           problems.push(problem);
           console.log(`Loaded problem: ${problem.id} - ${problem.title}`);
         } catch (error) {

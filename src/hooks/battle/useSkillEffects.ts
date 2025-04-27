@@ -1,174 +1,157 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { CODE_GIBBERISH } from '../../constants/battleConstants';
+import { BattleState } from '../../constants/battleConstants';
+import { Skill } from '../../components/battle-arena/DraggableSkill';
 
 interface UseSkillEffectsProps {
   userEmail: string | undefined;
   sessionId: string | null;
-  battleState: string;
+  battleState: BattleState;
 }
 
-export const useSkillEffects = ({ userEmail, sessionId, battleState }: UseSkillEffectsProps) => {
+interface SkillEffectsResult {
+  editorFrozen: boolean;
+  setEditorFrozen: (frozen: boolean) => void;
+  editorFrozenEndTime: number | null;
+  setEditorFrozenEndTime: (time: number | null) => void;
+  availableSkills: Skill[];
+  setAvailableSkills: (skills: Skill[]) => void;
+  debugMsg: string;
+  setDebugMsg: (msg: string) => void;
+  useSkill: (skillName: string, targetUser: string) => void;
+  handleFreezeEffect: (fromUser: string) => void;
+  handleChaosEffect: (fromUser: string, userCode: string, setUserCode: (code: string) => void) => void;
+}
+
+export const useSkillEffects = ({ 
+  userEmail, 
+  sessionId,
+  battleState 
+}: UseSkillEffectsProps): SkillEffectsResult => {
   const [editorFrozen, setEditorFrozen] = useState(false);
   const [editorFrozenEndTime, setEditorFrozenEndTime] = useState<number | null>(null);
-  const [availableSkills, setAvailableSkills] = useState<{name: string, icon: string, available: boolean}[]>([
+  const [availableSkills, setAvailableSkills] = useState<Skill[]>([
     { name: 'Freeze', icon: '❄️', available: true },
-    { name: 'Code Chaos', icon: '💥', available: true },
+    { name: 'Code Chaos', icon: '💥', available: true }
   ]);
-  const [debugMsg, setDebugMsg] = useState<string | null>(null);
+  const [debugMsg, setDebugMsg] = useState('');
   
-  // Function to use a skill against another player - memoized
-  const useSkill = useCallback(async (skillName: string, targetEmail: string) => {
-    if (!userEmail) return;
+  // Reset skills when battle state changes
+  useEffect(() => {
+    if (battleState === 'battle_room') {
+      setAvailableSkills([
+        { name: 'Freeze', icon: '❄️', available: true },
+        { name: 'Code Chaos', icon: '💥', available: true }
+      ]);
+    }
+  }, [battleState]);
+  
+  // Use a skill
+  const useSkill = (skillName: string, targetUser: string) => {
+    if (!userEmail || !sessionId || !targetUser) return;
     
-    // Find the skill and mark it as unavailable
-    setAvailableSkills(prev => 
-      prev.map(skill => 
-        skill.name === skillName ? { ...skill, available: false } : skill
-      )
-    );
-    
-    // Send the skill effect via the database
     try {
-      // Create a skill effect record
-      await supabase
-        .from('battle_skill_effects')
-        .insert({
-          from_user: userEmail,
-          target_user: targetEmail,
-          skill_name: skillName,
-          applied_at: new Date().toISOString(),
-          battle_session_id: sessionId || 'default-battle-session'
-        });
-        
-      // Also broadcast the effect via realtime
-      const channel = supabase.channel('battle_skills', {
+      console.log(`Using skill ${skillName} on ${targetUser}`);
+      
+      // Mark the skill as unavailable
+      setAvailableSkills(prev => prev.map(skill => 
+        skill.name === skillName ? { ...skill, available: false } : skill
+      ));
+      
+      // Create a channel specific to the target user
+      const targetChannelId = `battle_skills_${targetUser.replace('@', '_at_')}_${sessionId}`;
+      
+      console.log(`Broadcasting skill effect to channel: ${targetChannelId}`);
+      
+      const skillChannel = supabase.channel(targetChannelId, {
         config: {
-          broadcast: { self: false }
+          broadcast: { self: true }
         }
       });
       
-      // First subscribe, then send after subscription is confirmed
-      channel.subscribe(async (status) => {
+      skillChannel.subscribe(async (status) => {
         if (status !== 'SUBSCRIBED') {
-          console.log('Channel subscription status:', status);
+          console.log('Skill channel status:', status);
           return;
         }
         
-        console.log('Battle skills channel subscribed, sending skill effect');
-        
-        // Now that we're subscribed, broadcast the message
-        await channel.send({
+        // Broadcast the skill effect
+        await skillChannel.send({
           type: 'broadcast',
           event: 'skill_used',
           payload: {
-            from_user: userEmail,
-            target_user: targetEmail,
             skill_name: skillName,
-            applied_at: new Date().toISOString()
+            from_user: userEmail,
+            target_user: targetUser,
+            timestamp: new Date().toISOString()
           }
         });
         
-        console.log(`Skill ${skillName} broadcast sent to ${targetEmail}`);
+        console.log('Skill effect broadcast sent');
+        
+        // Update debug message
+        setDebugMsg(`You used ${skillName} on ${targetUser.split('@')[0]}!`);
         
         // Unsubscribe after sending to avoid keeping too many channels open
         setTimeout(() => {
-          channel.unsubscribe();
+          skillChannel.unsubscribe();
         }, 1000);
       });
-      
-      setDebugMsg(`Used ${skillName} on ${targetEmail.split('@')[0]}!`);
-    } catch (error) {
-      console.error('Error using skill:', error);
-      setDebugMsg('Failed to use skill - try again');
-      
-      // Reset the skill to available
-      setAvailableSkills(prev => 
-        prev.map(skill => 
-          skill.name === skillName ? { ...skill, available: true } : skill
-        )
-      );
+    } catch (err) {
+      console.error('Error using skill:', err);
+      setDebugMsg('Error using skill');
     }
-  }, [userEmail, sessionId]); // Dependencies for useSkill
+  };
   
-  // Handle skill effects - memoized
-  const handleFreezeEffect = useCallback((fromUser: string) => {
-    // Freeze the editor for 10 seconds
-    setEditorFrozen(true);
-    setEditorFrozenEndTime(Date.now() + 10000); // 10 seconds from now
-    setDebugMsg(`❄️ Your editor has been frozen by ${fromUser} for 10 seconds!`);
-    
-    // Create a countdown to unfreeze
-    const unfreezeTimer = setTimeout(() => {
-      setEditorFrozen(false);
-      setEditorFrozenEndTime(null);
-      setDebugMsg('Your editor has been unfrozen');
-    }, 10000);
-    
-    return () => clearTimeout(unfreezeTimer);
-  }, []);
-  
-  const handleChaosEffect = useCallback((fromUser: string, userCode: string, setUserCode: (code: string) => void) => {
-    // Insert random gibberish at random positions in the code
-    setDebugMsg(`💥 ${fromUser} cast Code Chaos on your editor!`);
-    
-    // Save the current code
-    const currentCode = userCode;
-    
-    // Pick 2-3 random pieces of gibberish
-    const numGibberish = Math.floor(Math.random() * 2) + 2;
-    let newCode = currentCode;
-    
-    for (let i = 0; i < numGibberish; i++) {
-      // Get a random gibberish item
-      const randomGibberish = CODE_GIBBERISH[Math.floor(Math.random() * CODE_GIBBERISH.length)];
+  // Handle Freeze skill effect
+  const handleFreezeEffect = (fromUser: string) => {
+    try {
+      console.log(`Handling Freeze effect from ${fromUser}`);
       
-      // Split the code into lines
-      const lines = newCode.split('\n');
+      // Set editor as frozen
+      setEditorFrozen(true);
       
-      // Pick a random line to insert the gibberish
-      const randomLineIndex = Math.floor(Math.random() * lines.length);
+      // Set end time (15 seconds from now)
+      const endTime = Date.now() + 15000;
+      setEditorFrozenEndTime(endTime);
       
-      // Insert the gibberish
-      lines.splice(randomLineIndex, 0, randomGibberish);
+      // Set debug message
+      setDebugMsg(`💀 ${fromUser} froze your editor for 15 seconds!`);
       
-      // Join the lines back together
-      newCode = lines.join('\n');
+      // Set a timer to unfreeze
+      setTimeout(() => {
+        setEditorFrozen(false);
+        setEditorFrozenEndTime(null);
+        setDebugMsg(`Your editor has been unfrozen.`);
+      }, 15000);
+    } catch (err) {
+      console.error('Error handling freeze effect:', err);
     }
-    
-    // Update the code with gibberish
-    setUserCode(newCode);
-  }, []);
+  };
   
-  // Listen for skill effects applied to this user
-  useEffect(() => {
-    if (!userEmail || !sessionId || battleState !== 'battle_room') return;
-    
-    console.log('Setting up skill effects listener...');
-    
-    // Create a channel with a stable ID to prevent multiple subscriptions
-    const channelId = `skills_listener_${userEmail}`;
-    
-    // Create a channel to receive skill updates
-    const skillsChannel = supabase.channel(channelId, {
-      config: {
-        broadcast: { self: false } // Don't receive your own broadcasts
+  // Handle Code Chaos skill effect
+  const handleChaosEffect = (fromUser: string, userCode: string, setUserCode: (code: string) => void) => {
+    try {
+      console.log(`Handling Code Chaos effect from ${fromUser}`);
+      
+      // Scramble the code
+      const codeLines = userCode.split('\n');
+      
+      // Shuffle the lines
+      for (let i = codeLines.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [codeLines[i], codeLines[j]] = [codeLines[j], codeLines[i]];
       }
-    });
-    
-    // Subscribe to skill events
-    skillsChannel
-      .on('broadcast', { event: 'skill_used' }, (payload) => {
-        console.log('Received skill effect:', payload);
-        // Only used for validation against re-renders - implementations in the component
-      })
-      .subscribe();
       
-    return () => {
-      console.log(`Cleaning up skills listener for ${channelId}`);
-      skillsChannel.unsubscribe();
-    };
-  }, [userEmail, sessionId, battleState]);
+      // Set the scrambled code
+      setUserCode(codeLines.join('\n'));
+      
+      // Set debug message
+      setDebugMsg(`😵 ${fromUser} used Code Chaos on your editor!`);
+    } catch (err) {
+      console.error('Error handling code chaos effect:', err);
+    }
+  };
   
   return {
     editorFrozen,

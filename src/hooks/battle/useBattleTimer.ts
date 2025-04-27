@@ -1,58 +1,76 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-interface UseBattleTimerOptions {
-  initialSeconds?: number;
-  autoStart?: boolean;
+interface UseBattleTimerProps {
+  initialSeconds: number;
 }
 
-export const useBattleTimer = ({ initialSeconds = 300, autoStart = false }: UseBattleTimerOptions = {}) => {
-  const [timeRemaining, setTimeRemaining] = useState<number>(initialSeconds);
-  const [isActive, setIsActive] = useState<boolean>(autoStart);
+interface TimerResult {
+  timeRemaining: string;
+  startTimer: () => void;
+  stopTimer: () => void;
+  resetTimer: () => void;
+}
+
+export const useBattleTimer = ({ initialSeconds }: UseBattleTimerProps): TimerResult => {
+  const [seconds, setSeconds] = useState(initialSeconds);
+  const [isActive, setIsActive] = useState(false);
+  const intervalRef = useRef<number | null>(null);
+  
+  // Format seconds to MM:SS
+  const formatTime = (secs: number): string => {
+    const minutes = Math.floor(secs / 60);
+    const remainingSeconds = secs % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
   
   // Start the timer
-  const startTimer = useCallback(() => {
+  const startTimer = () => {
     setIsActive(true);
-  }, []);
+  };
   
   // Stop the timer
-  const stopTimer = useCallback(() => {
+  const stopTimer = () => {
     setIsActive(false);
-  }, []);
+  };
   
   // Reset the timer
-  const resetTimer = useCallback((newTime?: number) => {
-    setTimeRemaining(newTime || initialSeconds);
+  const resetTimer = () => {
+    setSeconds(initialSeconds);
     setIsActive(false);
-  }, [initialSeconds]);
+  };
   
   // Handle the timer countdown
   useEffect(() => {
-    let timerId: NodeJS.Timeout | null = null;
-    
-    if (isActive && timeRemaining > 0) {
-      timerId = setInterval(() => {
-        setTimeRemaining(prev => {
-          if (prev <= 1) {
-            stopTimer();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
+    if (!isActive) {
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      return;
     }
     
+    intervalRef.current = window.setInterval(() => {
+      setSeconds(prevSeconds => {
+        if (prevSeconds <= 0) {
+          stopTimer();
+          return 0;
+        }
+        return prevSeconds - 1;
+      });
+    }, 1000);
+    
     return () => {
-      if (timerId) {
-        clearInterval(timerId);
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
     };
-  }, [isActive, timeRemaining, stopTimer]);
+  }, [isActive]);
   
   return {
-    timeRemaining,
+    timeRemaining: formatTime(seconds),
     startTimer,
     stopTimer,
-    resetTimer,
-    isActive
+    resetTimer
   };
 }; 
