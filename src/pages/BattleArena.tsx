@@ -1,5 +1,5 @@
 /// <reference path="../types/codemirror.d.ts" />
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -40,6 +40,64 @@ import { useSubmissionHandler } from '../hooks/battle/useSubmissionHandler';
 // Import shared types
 import { CodeProblem } from '../services/problemService';
 import { TestResults } from '../components/battle-arena/CodeEditor';
+
+// Helper function to safely render problem description with formatting
+const ProcessedMarkdown: React.FC<{ content: string; className?: string }> = ({ content, className = "" }) => {
+  const processedContent = useMemo(() => {
+    if (!content) return [];
+    
+    // Split by newline
+    const lines = content.split('\n');
+    
+    // Process each line to handle code blocks
+    return lines.map((line, index) => {
+      const segments: React.ReactNode[] = [];
+      let lastIndex = 0;
+      const codeRegex = /`([^`]+)`/g;
+      let match;
+      
+      // Find all code blocks in this line
+      while ((match = codeRegex.exec(line)) !== null) {
+        // Add text before code block
+        if (match.index > lastIndex) {
+          segments.push(
+            <span key={`text-${index}-${lastIndex}`}>
+              {line.substring(lastIndex, match.index)}
+            </span>
+          );
+        }
+        
+        // Add code block
+        segments.push(
+          <code key={`code-${index}-${match.index}`} className="bg-gray-800 px-1 py-0.5 rounded text-yellow-300">
+            {match[1]}
+          </code>
+        );
+        
+        lastIndex = match.index + match[0].length;
+      }
+      
+      // Add remaining text after last code block
+      if (lastIndex < line.length) {
+        segments.push(
+          <span key={`text-${index}-${lastIndex}`}>
+            {line.substring(lastIndex)}
+          </span>
+        );
+      }
+      
+      // Return the processed line with <br/> at the end
+      return (
+        <React.Fragment key={`line-${index}`}>
+          {segments.length > 0 ? segments : line}
+          {index < lines.length - 1 && <br />}
+        </React.Fragment>
+      );
+    });
+  }, [content]);
+
+  return <div className={className}>{processedContent}</div>;
+};
 
 // Main component
 const BattleArena: React.FC = () => {
@@ -567,11 +625,10 @@ function merge(nums1, m, nums2, n) {
                       <div className="p-4 h-[600px] overflow-y-auto">
                         <div className="prose prose-invert max-w-none">
                           <h2 className="text-xl font-bold text-white mb-4">{currentQuestion?.title}</h2>
-                          <div className="text-gray-200" dangerouslySetInnerHTML={{ 
-                            __html: currentQuestion?.description
-                              .replace(/\n/g, '<br>')
-                              .replace(/`([^`]+)`/g, '<code class="bg-gray-800 px-1 py-0.5 rounded text-yellow-300">$1</code>') || ''
-                          }} />
+                          <ProcessedMarkdown 
+                            content={currentQuestion?.description || ''} 
+                            className="text-gray-200" 
+                          />
                         </div>
                         
                         {/* Examples */}

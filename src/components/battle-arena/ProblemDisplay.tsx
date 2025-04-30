@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,64 @@ interface ProblemDisplayProps {
   isTestRunning?: boolean;
   hideInstructions?: boolean;
 }
+
+// Helper function to safely render problem description with formatting
+const ProcessedMarkdown: React.FC<{ content: string }> = ({ content }) => {
+  const processedContent = useMemo(() => {
+    if (!content) return [];
+    
+    // Split by newline
+    const lines = content.split('\n');
+    
+    // Process each line to handle code blocks
+    return lines.map((line, index) => {
+      const segments: React.ReactNode[] = [];
+      let lastIndex = 0;
+      const codeRegex = /`([^`]+)`/g;
+      let match;
+      
+      // Find all code blocks in this line
+      while ((match = codeRegex.exec(line)) !== null) {
+        // Add text before code block
+        if (match.index > lastIndex) {
+          segments.push(
+            <span key={`text-${index}-${lastIndex}`}>
+              {line.substring(lastIndex, match.index)}
+            </span>
+          );
+        }
+        
+        // Add code block
+        segments.push(
+          <code key={`code-${index}-${match.index}`}>
+            {match[1]}
+          </code>
+        );
+        
+        lastIndex = match.index + match[0].length;
+      }
+      
+      // Add remaining text after last code block
+      if (lastIndex < line.length) {
+        segments.push(
+          <span key={`text-${index}-${lastIndex}`}>
+            {line.substring(lastIndex)}
+          </span>
+        );
+      }
+      
+      // Return the processed line with <br/> at the end
+      return (
+        <React.Fragment key={`line-${index}`}>
+          {segments.length > 0 ? segments : line}
+          {index < lines.length - 1 && <br />}
+        </React.Fragment>
+      );
+    });
+  }, [content]);
+
+  return <div>{processedContent}</div>;
+};
 
 const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
   currentQuestion,
@@ -306,9 +364,7 @@ const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
         
         <TabsContent value="instructions" className="border-none p-0">
           <div className="prose prose-invert max-w-none">
-            <div dangerouslySetInnerHTML={{ 
-              __html: currentQuestion?.description.replace(/\n/g, '<br>').replace(/`([^`]+)`/g, '<code>$1</code>') || ''
-            }} />
+            <ProcessedMarkdown content={currentQuestion?.description || ''} />
           </div>
           
           {/* Examples */}

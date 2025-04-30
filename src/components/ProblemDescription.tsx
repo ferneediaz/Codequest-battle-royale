@@ -6,39 +6,65 @@ interface ProblemDescriptionProps {
   description: string;
 }
 
+interface ImageReplacement {
+  id: string;
+  description: string;
+  asciiDiagram: string;
+}
+
 const ProblemDescription: React.FC<ProblemDescriptionProps> = ({ description }) => {
-  const [processedDescription, setProcessedDescription] = useState<string>(description);
+  const [contentBlocks, setContentBlocks] = useState<React.ReactNode[]>([]);
 
   useEffect(() => {
     // Process the description to handle external image links
-    let processed = description;
+    const blocks: React.ReactNode[] = [];
+    let remainingText = description;
     
     // Replace image URLs with text descriptions
     const imageUrlRegex = /!\[.*?\]\((https:\/\/assets\.leetcode\.com\/uploads\/.*?)\)/g;
+    let match;
+    let lastIndex = 0;
     
-    processed = processed.replace(imageUrlRegex, (match, imageUrl) => {
+    while ((match = imageUrlRegex.exec(remainingText)) !== null) {
+      // Add text before the match
+      if (match.index > lastIndex) {
+        blocks.push(<div key={`text-${lastIndex}`}>{remainingText.substring(lastIndex, match.index)}</div>);
+      }
+      
+      const [fullMatch, imageUrl] = match;
       const image = getProblemImageDescription(imageUrl);
       
       if (image && image.asciiDiagram) {
-        return `
-<div class="problem-image-replacement">
-  <h4>Image: ${image.id}</h4>
-  <p>${image.description}</p>
-  <pre>${image.asciiDiagram}</pre>
-</div>
-`;
+        blocks.push(
+          <div className="problem-image-replacement" key={`img-${match.index}`}>
+            <h4>Image: {image.id}</h4>
+            <p>{image.description}</p>
+            <pre>{image.asciiDiagram}</pre>
+          </div>
+        );
+      } else {
+        // If no replacement found, add a warning
+        blocks.push(
+          <div key={`img-${match.index}`}>
+            {fullMatch} <em>(Note: External images may not display properly)</em>
+          </div>
+        );
       }
       
-      // If no replacement found, keep the original but add a warning
-      return `${match} <em>(Note: External images may not display properly)</em>`;
-    });
+      lastIndex = match.index + fullMatch.length;
+    }
     
-    setProcessedDescription(processed);
+    // Add any remaining text
+    if (lastIndex < remainingText.length) {
+      blocks.push(<div key={`text-${lastIndex}`}>{remainingText.substring(lastIndex)}</div>);
+    }
+    
+    setContentBlocks(blocks);
   }, [description]);
 
   return (
     <div className="problem-description">
-      <div dangerouslySetInnerHTML={{ __html: processedDescription }} />
+      {contentBlocks}
     </div>
   );
 };
