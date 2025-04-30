@@ -81,56 +81,8 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
 
       console.log('Run Tests - using visibleTests:', formattedTestCases);
       
-      // Check if user's code already has console.log/print statements
-      const hasConsoleLog = selectedLanguage === 'javascript' && 
-        userCode.includes('console.log');
-      const hasPrint = selectedLanguage === 'python' && 
-        userCode.includes('print');
-      
-      // Only inject debug logs if user doesn't have their own
+      // Use the user's code directly without injecting any console logs
       let submissionCode = userCode;
-      if (!hasConsoleLog && !hasPrint) {
-        // For JavaScript, add debug log at start of function
-        if (selectedLanguage === 'javascript') {
-          // Extract function declaration
-          const functionMatch = userCode.match(/(function\s+\w+\s*\([^)]*\)\s*{)/);
-          if (functionMatch) {
-            const functionDeclaration = functionMatch[1];
-            const insertionPoint = userCode.indexOf(functionDeclaration) + functionDeclaration.length;
-            
-            // Insert console.log after function opening brace with input details
-            submissionCode = [
-              userCode.slice(0, insertionPoint),
-              '\n  console.log("Function called with input:", ...arguments);\n',
-              userCode.slice(insertionPoint)
-            ].join('');
-          }
-        } 
-        // For Python, insert print statement 
-        else if (selectedLanguage === 'python') {
-          const functionMatch = userCode.match(/(def\s+\w+\s*\([^)]*\)\s*:)/);
-          if (functionMatch) {
-            const functionDeclaration = functionMatch[1];
-            const insertionPoint = userCode.indexOf(functionDeclaration) + functionDeclaration.length;
-            
-            // Get parameter names from function declaration
-            const paramMatch = functionDeclaration.match(/\(([^)]*)\)/);
-            const params = paramMatch ? paramMatch[1].split(',').map(p => p.trim()) : [];
-            
-            // Create a print statement that shows parameters
-            const printStmt = params.length > 0
-              ? `\n    print("Function called with: " + ", ".join([f"{param}={{{param}}}" for param in [${params.join(', ')}]]))\n`
-              : '\n    print("Function called")\n';
-              
-            // Insert print after function declaration
-            submissionCode = [
-              userCode.slice(0, insertionPoint),
-              printStmt,
-              userCode.slice(insertionPoint)
-            ].join('');
-          }
-        }
-      }
       
       console.log('Submitted code:', submissionCode);
 

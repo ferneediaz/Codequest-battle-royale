@@ -135,11 +135,6 @@ rl.on('close', () => {
           }
         }
         
-        // Only inject debug log if user did NOT write their own console.log
-        if (!userHasConsoleLog) {
-          console.log("Function called with input:", Array.isArray(parsedInput) ? parsedInput.join(",") : parsedInput);
-        }
-        
         // Attempt to call the function
         let result = null;
         // Helper function to create a linked list
