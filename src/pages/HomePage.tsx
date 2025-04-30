@@ -80,7 +80,7 @@ const HomePage = () => {
             </span>
           </div>
           <h1 className="text-5xl md:text-6xl font-extrabold mb-4 text-white tracking-tight">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
+            <span className="inline-block text-indigo-400 py-2">
               Algorithm Battle Royale
             </span>
           </h1>

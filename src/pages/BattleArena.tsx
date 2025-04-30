@@ -429,8 +429,6 @@ function merge(nums1, m, nums2, n) {
     if (battleState === 'topic_selection') {
       return (
         <>
-          <h1 className="text-4xl font-bold text-white mb-4">Battle Arena</h1>
-          
           <div className="mb-6 text-center">
             <div className="text-5xl font-bold text-white mb-2">{playerCount}</div>
             <p className="text-slate-400 text-xl">Warriors Present</p>
@@ -569,19 +567,21 @@ function merge(nums1, m, nums2, n) {
                       <div className="p-4 h-[600px] overflow-y-auto">
                         <div className="prose prose-invert max-w-none">
                           <h2 className="text-xl font-bold text-white mb-4">{currentQuestion?.title}</h2>
-                          <div dangerouslySetInnerHTML={{ 
-                            __html: currentQuestion?.description.replace(/\n/g, '<br>').replace(/`([^`]+)`/g, '<code>$1</code>') || ''
+                          <div className="text-gray-200" dangerouslySetInnerHTML={{ 
+                            __html: currentQuestion?.description
+                              .replace(/\n/g, '<br>')
+                              .replace(/`([^`]+)`/g, '<code class="bg-gray-800 px-1 py-0.5 rounded text-yellow-300">$1</code>') || ''
                           }} />
                         </div>
                         
                         {/* Examples */}
                         {currentQuestion?.examples && currentQuestion.examples.length > 0 && (
-                          <div className="mt-4">
-                            <h3 className="text-lg font-medium text-white mb-2">Examples</h3>
-                            <div className="space-y-3">
+                          <div className="mt-6">
+                            <h3 className="text-lg font-medium text-white mb-3">Examples</h3>
+                            <div className="space-y-4">
                               {currentQuestion.examples.map((example, index) => (
-                                <div key={index} className="bg-gray-800 p-3 rounded-md">
-                                  <pre className="text-sm text-gray-300 whitespace-pre-wrap">{example}</pre>
+                                <div key={index} className="bg-gray-800 p-4 rounded-md border border-gray-700">
+                                  <pre className="text-sm text-gray-300 whitespace-pre-wrap font-mono">{example}</pre>
                                 </div>
                               ))}
                             </div>
@@ -590,9 +590,9 @@ function merge(nums1, m, nums2, n) {
                         
                         {/* Constraints */}
                         {currentQuestion?.constraints && currentQuestion.constraints.length > 0 && (
-                          <div className="mt-4">
-                            <h3 className="text-lg font-medium text-white mb-2">Constraints</h3>
-                            <ul className="list-disc pl-5 space-y-1">
+                          <div className="mt-6">
+                            <h3 className="text-lg font-medium text-white mb-3">Constraints</h3>
+                            <ul className="list-disc pl-6 space-y-2">
                               {currentQuestion.constraints.map((constraint, index) => (
                                 <li key={index} className="text-sm text-gray-300">{constraint}</li>
                               ))}
@@ -600,7 +600,7 @@ function merge(nums1, m, nums2, n) {
                           </div>
                         )}
                         
-                        <div className="mt-4 text-center">
+                        <div className="mt-6 text-center">
                           <Button 
                             variant="outline" 
                             className="border-gray-600 text-gray-300 hover:bg-gray-700/50"
