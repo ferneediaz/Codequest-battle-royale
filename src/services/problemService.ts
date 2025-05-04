@@ -12,8 +12,14 @@ export interface CodeProblem {
   description: string;
   difficulty: 'easy' | 'medium' | 'hard';
   category: string;
-  starterCode: Record<string, string>;
-  solutionCode?: Record<string, string>;
+  starterCode: {
+    javascript: string;
+    python: string;
+  };
+  solutionCode?: {
+    javascript: string;
+    python: string;
+  };
   constraints?: string[];
   examples?: string[];
   testCases: TestCase[];

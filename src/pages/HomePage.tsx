@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import Logo from "@/components/Logo";
 import FloatingCodeBackground from '@/components/FloatingCodeBackground';
 import { useAuth } from '../contexts/AuthContext';
+import { Shield, Crown, Sword } from "lucide-react";
+import CodeQuestLogo from "@/components/CodeQuestLogo";
 
 // RPG-themed battle categories
 const BATTLE_CATEGORIES = [
@@ -50,8 +52,12 @@ const HomePage = () => {
       {user && (
         <header className="w-full bg-gray-900/80 backdrop-blur-sm border-b border-gray-800 py-3 px-4 relative z-[100]">
           <div className="max-w-6xl mx-auto flex items-center justify-between">
-            <div className="h-10 w-10 cursor-pointer" onClick={() => navigate('/')}>
-              <Logo />
+            <div className="cursor-pointer" onClick={() => navigate('/')}>
+              <CodeQuestLogo 
+                iconSize={6} 
+                titleClassName="text-xl font-bold text-white" 
+                showIcons={false} 
+              />
             </div>
             <div className="flex items-center">
               <span className="text-slate-300 mr-3">{user.email}</span>
@@ -70,10 +76,27 @@ const HomePage = () => {
 
       {/* Main Content */}
       <div className="relative z-[100] max-w-6xl mx-auto px-4 py-12">
-        <Logo />
+        {/* Second Space Logo - Smaller */}
+        {/* <div className="text-center mb-2">
+          <div className="h-10 w-auto mx-auto">
+            <Logo />
+          </div>
+        </div> */}
+        
+        {/* CodeQuest Battles Logo */}
+        <div className="text-center mb-8 opacity-0 animate-fadeIn" style={{ animation: 'fadeIn 0.6s forwards' }}>
+          <div className="flex justify-center gap-4 mb-3">
+            <Shield className="w-12 h-12 text-indigo-400 animate-jump" />
+            <Crown className="w-12 h-12 text-yellow-500 animate-jump" style={{ animationDelay: "0.3s" }} />
+            <Sword className="w-12 h-12 text-blue-400 animate-jump" style={{ animationDelay: "0.6s" }} />
+          </div>
+          <h1 className="text-5xl md:text-8xl font-bold text-white tracking-tight">
+            CodeQuest Battles
+          </h1>
+        </div>
         
         {/* Epic title with fantasy styling */}
-        <div className="text-center mb-12 opacity-0 animate-fadeIn" style={{ animation: 'fadeIn 0.6s forwards' }}>
+        <div className="text-center mb-12 opacity-0 animate-fadeIn" style={{ animation: 'fadeIn 0.6s 0.2s forwards' }}>
           <div className="mb-2">
             <span className="inline-block px-4 py-1 bg-indigo-900/40 rounded-full text-xs font-semibold text-indigo-300 border border-indigo-700/50">
               LEGENDARY EVENT

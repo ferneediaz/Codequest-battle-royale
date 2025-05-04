@@ -6,11 +6,19 @@
   "category": "Forest of Arrays",
   "starterCode": {
     "javascript": "/**\n * @param {number[]} nums\n * @param {number} target\n * @return {number[]}\n */\nfunction twoSum(nums, target) {\n  // Your code here\n}",
-    "python": "def two_sum(nums, target):\n    \"\"\"\n    :type nums: List[int]\n    :type target: int\n    :rtype: List[int]\n    \"\"\"\n    # Your code here\n    pass"
+    "python": "def two_sum(nums, target):\n    \"\"\"\n    :type nums: List[int]\n    :type target: int\n    :rtype: List[int]\n    \"\"\"\n    # Your code here\n    pass",
+    "java": "class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        // Your code here\n        return new int[0];\n    }\n}",
+    "cpp": "class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n        // Your code here\n        return {};\n    }\n};",
+    "go": "func twoSum(nums []int, target int) []int {\n    // Your code here\n    return nil\n}",
+    "rust": "impl Solution {\n    pub fn two_sum(nums: Vec<i32>, target: i32) -> Vec<i32> {\n        // Your code here\n        vec![]\n    }\n}"
   },
   "solutionCode": {
     "javascript": "/**\n * @param {number[]} nums\n * @param {number} target\n * @return {number[]}\n */\nfunction twoSum(nums, target) {\n  const map = new Map();\n  \n  for (let i = 0; i < nums.length; i++) {\n    const complement = target - nums[i];\n    \n    if (map.has(complement)) {\n      return [map.get(complement), i];\n    }\n    \n    map.set(nums[i], i);\n  }\n  \n  return [];\n}",
-    "python": "def two_sum(nums, target):\n    map = {}\n    \n    for i, num in enumerate(nums):\n        complement = target - num\n        \n        if complement in map:\n            return [map[complement], i]\n        \n        map[num] = i\n    \n    return []"
+    "python": "def two_sum(nums, target):\n    map = {}\n    \n    for i, num in enumerate(nums):\n        complement = target - num\n        \n        if complement in map:\n            return [map[complement], i]\n        \n        map[num] = i\n    \n    return []",
+    "java": "class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        Map<Integer, Integer> map = new HashMap<>();\n        \n        for (int i = 0; i < nums.length; i++) {\n            int complement = target - nums[i];\n            \n            if (map.containsKey(complement)) {\n                return new int[] { map.get(complement), i };\n            }\n            \n            map.put(nums[i], i);\n        }\n        \n        return new int[0]; // No solution found\n    }\n}",
+    "cpp": "class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n        unordered_map<int, int> map;\n        \n        for (int i = 0; i < nums.size(); i++) {\n            int complement = target - nums[i];\n            \n            if (map.find(complement) != map.end()) {\n                return {map[complement], i};\n            }\n            \n            map[nums[i]] = i;\n        }\n        \n        return {}; // No solution found\n    }\n};",
+    "go": "func twoSum(nums []int, target int) []int {\n    numMap := make(map[int]int)\n    \n    for i, num := range nums {\n        complement := target - num\n        \n        if j, found := numMap[complement]; found {\n            return []int{j, i}\n        }\n        \n        numMap[num] = i\n    }\n    \n    return nil // No solution found\n}",
+    "rust": "impl Solution {\n    pub fn two_sum(nums: Vec<i32>, target: i32) -> Vec<i32> {\n        let mut map: std::collections::HashMap<i32, i32> = std::collections::HashMap::new();\n        \n        for (i, &num) in nums.iter().enumerate() {\n            let complement = target - num;\n            \n            if let Some(&j) = map.get(&complement) {\n                return vec![j, i as i32];\n            }\n            \n            map.insert(num, i as i32);\n        }\n        \n        vec![] // No solution found\n    }\n}"
   },
   "constraints": [
     "2 <= nums.length <= 10^4",

@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { python } from '@codemirror/lang-python';
+import { cpp } from '@codemirror/lang-cpp';
+import { java } from '@codemirror/lang-java';
+import { rust } from '@codemirror/lang-rust';
 import { formatTime, getFreezeRemainingTime } from '../../utils/battleUtils';
 import { Button } from "@/components/ui/button";
 import { CodeProblem } from '../../services/problemService';
@@ -38,6 +41,24 @@ interface CodeEditorProps {
   onTestRun: (results: TestResults | null, isRunning: boolean) => void;
   isSubmitting?: boolean;
 }
+
+// Helper function to get the appropriate file extension
+const getFileExtension = (language: string): string => {
+  switch (language) {
+    case 'javascript': return 'js';
+    case 'python': return 'py';
+    default: return 'txt';
+  }
+};
+
+// Helper function to get the appropriate CodeMirror language extension
+const getLanguageExtension = (language: string) => {
+  switch (language) {
+    case 'javascript': return javascript({ jsx: true });
+    case 'python': return python();
+    default: return javascript({ jsx: true });
+  }
+};
 
 const CodeEditor: React.FC<CodeEditorProps> = ({
   userCode,
@@ -274,7 +295,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     <div className="flex flex-col">
       <div className="bg-gray-800 px-4 py-2 text-gray-300 text-sm flex justify-between items-center rounded-t-lg">
         <div className="flex items-center">
-          <span>solution.{selectedLanguage === 'javascript' ? 'js' : 'py'}</span>
+          <span>solution.{getFileExtension(selectedLanguage)}</span>
           <select
             className="ml-4 bg-gray-700 text-white text-sm rounded px-2 py-1"
             value={selectedLanguage}
@@ -314,7 +335,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
             value={userCode}
             height="500px"
             theme="dark"
-            extensions={[selectedLanguage === 'javascript' ? javascript({ jsx: true }) : python()]}
+            extensions={[getLanguageExtension(selectedLanguage)]}
             onChange={(value) => {
               if (!editorFrozen && isQuestionSelected) {
                 setUserCode(value);

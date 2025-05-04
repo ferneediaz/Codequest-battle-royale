@@ -29,11 +29,19 @@ Each problem JSON file must follow this schema:
   "category": "Category Name",
   "starterCode": {
     "javascript": "// JS starter code",
-    "python": "# Python starter code"
+    "python": "# Python starter code",
+    "java": "// Java starter code",
+    "cpp": "// C++ starter code",
+    "go": "// Go starter code",
+    "rust": "// Rust starter code"
   },
   "solutionCode": {
     "javascript": "// JS solution code",
-    "python": "# Python solution code"
+    "python": "# Python solution code",
+    "java": "// Java solution code",
+    "cpp": "// C++ solution code",
+    "go": "// Go solution code",
+    "rust": "// Rust solution code"
   },
   "constraints": [
     "Constraint 1",

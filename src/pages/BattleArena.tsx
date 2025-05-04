@@ -36,10 +36,14 @@ import { useQuestionLoader } from '../hooks/battle/useQuestionLoader';
 import { useBattleSession } from '../hooks/battle/useBattleSession';
 import { useTopicSelection } from '../hooks/battle/useTopicSelection';
 import { useSubmissionHandler } from '../hooks/battle/useSubmissionHandler';
+import { useCharacterCountTracker } from '../hooks/battle/useCharacterCountTracker';
 
 // Import shared types
 import { CodeProblem } from '../services/problemService';
 import { TestResults } from '../components/battle-arena/CodeEditor';
+
+// Define allowed language types
+type ProgrammingLanguage = 'javascript' | 'python';
 
 // Helper function to safely render problem description with formatting
 const ProcessedMarkdown: React.FC<{ content: string; className?: string }> = ({ content, className = "" }) => {
@@ -142,30 +146,9 @@ const BattleArena: React.FC = () => {
   } = useTopicSelection(user);
   
   // Add state for selected language
-  const [selectedLanguage, setSelectedLanguage] = useState<string>('javascript');
-  const [userCode, setUserCode] = useState<string>(`/**
- * @param {number[]} nums1
- * @param {number} m
- * @param {number[]} nums2
- * @param {number} n
- * @return {void} Do not return anything, modify nums1 in-place instead.
- */
-function merge(nums1, m, nums2, n) {
-  let p1 = m - 1;
-  let p2 = n - 1;
-  let p = m + n - 1;
-  
-  while (p2 >= 0) {
-    if (p1 >= 0 && nums1[p1] > nums2[p2]) {
-      nums1[p] = nums1[p1];
-      p1--;
-    } else {
-      nums1[p] = nums2[p2];
-      p2--;
-    }
-    p--;
-  }
-}`);
+  const [selectedLanguage, setSelectedLanguage] = useState<ProgrammingLanguage>('javascript');
+  const [userCode, setUserCode] = useState<string>(`// Select a problem to start coding
+// Your code will appear here`);
   
   // Question/problem selection state
   const [isQuestionSelected, setIsQuestionSelected] = useState(false);
@@ -228,6 +211,18 @@ function merge(nums1, m, nums2, n) {
     handleSubmitSolution,
     celebrateSuccess
   } = useSubmissionHandler(user, currentProblem);
+
+  // Use character count tracker hook
+  const {
+    userCharCounts
+  } = useCharacterCountTracker({
+    userEmail: user?.email,
+    sessionId,
+    battleState,
+    currentProblem,
+    userCode,
+    selectedLanguage
+  });
   
   // Create compatibility variables for the old hook interface
   const [availableQuestions, setAvailableQuestions] = useState<CodeProblem[]>([]);
@@ -269,8 +264,8 @@ function merge(nums1, m, nums2, n) {
       setIsQuestionSelected(true);
       // Make sure state update is applied
       setTimeout(() => {
-        if (problem?.starterCode?.[selectedLanguage]) {
-          setUserCode(problem.starterCode[selectedLanguage]);
+        if (problem?.starterCode?.[selectedLanguage as keyof typeof problem.starterCode]) {
+          setUserCode(problem.starterCode[selectedLanguage as keyof typeof problem.starterCode]);
         }
       }, 0);
       return problem;
@@ -304,9 +299,9 @@ function merge(nums1, m, nums2, n) {
 
   // Update code when the selected problem changes
   useEffect(() => {
-    if (currentQuestion && currentQuestion.starterCode && currentQuestion.starterCode[selectedLanguage]) {
+    if (currentQuestion && currentQuestion.starterCode && currentQuestion.starterCode[selectedLanguage as keyof typeof currentQuestion.starterCode]) {
       // Set the starter code for the currently selected problem and language
-      setUserCode(currentQuestion.starterCode[selectedLanguage]);
+      setUserCode(currentQuestion.starterCode[selectedLanguage as keyof typeof currentQuestion.starterCode]);
     }
   }, [currentQuestion, selectedLanguage]);
   
@@ -349,8 +344,8 @@ function merge(nums1, m, nums2, n) {
       
       // Make sure state update is applied
       setTimeout(() => {
-        if (problem.starterCode?.[selectedLanguage]) {
-          setUserCode(problem.starterCode[selectedLanguage]);
+        if (problem.starterCode?.[selectedLanguage as keyof typeof problem.starterCode]) {
+          setUserCode(problem.starterCode[selectedLanguage as keyof typeof problem.starterCode]);
         }
       }, 0);
       
@@ -482,6 +477,13 @@ function merge(nums1, m, nums2, n) {
     handleSubmitSolution(userCode, selectedLanguage, setDebugMsg);
   };
 
+  // Adapter for setSelectedLanguage
+  const setSelectedLanguageAdapter = (language: string) => {
+    if (language === 'javascript' || language === 'python') {
+      setSelectedLanguage(language);
+    }
+  };
+
   // Render the appropriate content based on the battle state
   const renderContent = () => {
     if (battleState === 'topic_selection') {
@@ -556,6 +558,7 @@ function merge(nums1, m, nums2, n) {
             connectedUsers={connectedUsers}
             currentUserEmail={user?.email}
             playerScores={playerScores}
+            userCharCounts={userCharCounts}
             availableSkills={availableSkills}
             selectedTopics={selectedTopics}
             onUseSkill={useSkill}
@@ -585,7 +588,7 @@ function merge(nums1, m, nums2, n) {
                   userCode={userCode}
                   setUserCode={setUserCode}
                   selectedLanguage={selectedLanguage}
-                  setSelectedLanguage={setSelectedLanguage}
+                  setSelectedLanguage={setSelectedLanguageAdapter}
                   timeRemaining={timeRemaining}
                   editorFrozen={editorFrozen}
                   editorFrozenEndTime={editorFrozenEndTime}
@@ -755,7 +758,7 @@ function merge(nums1, m, nums2, n) {
                   userCode={userCode}
                   setUserCode={setUserCode}
                   selectedLanguage={selectedLanguage}
-                  setSelectedLanguage={setSelectedLanguage}
+                  setSelectedLanguage={setSelectedLanguageAdapter}
                   timeRemaining={timeRemaining}
                   editorFrozen={editorFrozen}
                   editorFrozenEndTime={editorFrozenEndTime}
@@ -809,9 +812,9 @@ function merge(nums1, m, nums2, n) {
         
         <Card className={`p-8 bg-gray-900 border-gray-800 w-full text-center 
           ${battleState === 'battle_room' ? 'max-w-6xl' : 'max-w-4xl'}`}>
-          <div className="w-42 h-42 mx-auto mb-6">
+          {/* <div className="w-42 h-42 mx-auto mb-6">
             <Logo className="h-32" />
-          </div>
+          </div> */}
           
           {/* Battle header with title and timer */}
           <BattleHeader 

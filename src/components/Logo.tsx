@@ -11,7 +11,7 @@ const Logo: React.FC<LogoProps> = ({ className }) => {
       <img 
         src={secondSpaceLogo} 
         alt="Second Space Logo" 
-        className="h-20 w-auto"
+        className="h-12 w-auto"
         style={{ filter: 'invert(1)' }} 
       />
     </div>

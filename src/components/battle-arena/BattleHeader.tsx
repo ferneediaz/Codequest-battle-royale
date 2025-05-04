@@ -1,5 +1,6 @@
 import React from 'react';
 import { BattleState } from '../../constants/battleConstants';
+import CodeQuestLogo from '../CodeQuestLogo';
 
 interface BattleHeaderProps {
   battleState: BattleState;
@@ -13,14 +14,14 @@ const BattleHeader: React.FC<BattleHeaderProps> = ({
   // Render different headers based on the battle state
   if (battleState === 'topic_selection') {
     return (
-      <h1 className="text-4xl font-bold text-white mb-4">Battle Arena</h1>
+      <CodeQuestLogo iconSize={8} titleClassName="text-3xl font-bold text-white mb-4" />
     );
   }
 
   // Battle room header with timer
   return (
     <div className="flex justify-between items-center mb-4">
-      <h1 className="text-3xl font-bold text-white">Battle in Progress</h1>
+      <CodeQuestLogo iconSize={6} titleClassName="text-2xl font-bold text-white" />
       <div className="text-2xl font-mono font-bold text-amber-400">{timeRemaining}</div>
     </div>
   );

@@ -6,11 +6,19 @@
   "category": "Binary Search Castle",
   "starterCode": {
     "javascript": "/**\n * @param {number[]} nums\n * @param {number} target\n * @return {number}\n */\nfunction search(nums, target) {\n  // Your code here\n}",
-    "python": "def search(nums, target):\n    \"\"\"\n    :type nums: List[int]\n    :type target: int\n    :rtype: int\n    \"\"\"\n    # Your code here\n    pass"
+    "python": "def search(nums, target):\n    \"\"\"\n    :type nums: List[int]\n    :type target: int\n    :rtype: int\n    \"\"\"\n    # Your code here\n    pass",
+    "java": "class Solution {\n    public int search(int[] nums, int target) {\n        // Your code here\n        return -1;\n    }\n}",
+    "cpp": "class Solution {\npublic:\n    int search(vector<int>& nums, int target) {\n        // Your code here\n        return -1;\n    }\n};",
+    "go": "func search(nums []int, target int) int {\n    // Your code here\n    return -1\n}",
+    "rust": "impl Solution {\n    pub fn search(nums: Vec<i32>, target: i32) -> i32 {\n        // Your code here\n        -1\n    }\n}"
   },
   "solutionCode": {
     "javascript": "/**\n * @param {number[]} nums\n * @param {number} target\n * @return {number}\n */\nfunction search(nums, target) {\n  let left = 0;\n  let right = nums.length - 1;\n  \n  while (left <= right) {\n    const mid = Math.floor((left + right) / 2);\n    \n    if (nums[mid] === target) {\n      return mid;\n    } else if (nums[mid] < target) {\n      left = mid + 1;\n    } else {\n      right = mid - 1;\n    }\n  }\n  \n  return -1;\n}",
-    "python": "def search(nums, target):\n    left = 0\n    right = len(nums) - 1\n    \n    while left <= right:\n        mid = (left + right) // 2\n        \n        if nums[mid] == target:\n            return mid\n        elif nums[mid] < target:\n            left = mid + 1\n        else:\n            right = mid - 1\n    \n    return -1"
+    "python": "def search(nums, target):\n    left = 0\n    right = len(nums) - 1\n    \n    while left <= right:\n        mid = (left + right) // 2\n        \n        if nums[mid] == target:\n            return mid\n        elif nums[mid] < target:\n            left = mid + 1\n        else:\n            right = mid - 1\n    \n    return -1",
+    "java": "class Solution {\n    public int search(int[] nums, int target) {\n        int left = 0;\n        int right = nums.length - 1;\n        \n        while (left <= right) {\n            int mid = left + (right - left) / 2;\n            \n            if (nums[mid] == target) {\n                return mid;\n            } else if (nums[mid] < target) {\n                left = mid + 1;\n            } else {\n                right = mid - 1;\n            }\n        }\n        \n        return -1;\n    }\n}",
+    "cpp": "class Solution {\npublic:\n    int search(vector<int>& nums, int target) {\n        int left = 0;\n        int right = nums.size() - 1;\n        \n        while (left <= right) {\n            int mid = left + (right - left) / 2;\n            \n            if (nums[mid] == target) {\n                return mid;\n            } else if (nums[mid] < target) {\n                left = mid + 1;\n            } else {\n                right = mid - 1;\n            }\n        }\n        \n        return -1;\n    }\n};",
+    "go": "func search(nums []int, target int) int {\n    left := 0\n    right := len(nums) - 1\n    \n    for left <= right {\n        mid := left + (right - left) / 2\n        \n        if nums[mid] == target {\n            return mid\n        } else if nums[mid] < target {\n            left = mid + 1\n        } else {\n            right = mid - 1\n        }\n    }\n    \n    return -1\n}",
+    "rust": "impl Solution {\n    pub fn search(nums: Vec<i32>, target: i32) -> i32 {\n        let mut left = 0;\n        let mut right = nums.len() as i32 - 1;\n        \n        while left <= right {\n            let mid = left + (right - left) / 2;\n            let mid_idx = mid as usize;\n            \n            if nums[mid_idx] == target {\n                return mid;\n            } else if nums[mid_idx] < target {\n                left = mid + 1;\n            } else {\n                right = mid - 1;\n            }\n        }\n        \n        -1\n    }\n}"
   },
   "constraints": [
     "1 <= nums.length <= 10^4",

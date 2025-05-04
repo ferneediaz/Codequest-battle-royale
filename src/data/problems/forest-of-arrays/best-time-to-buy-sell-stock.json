@@ -6,11 +6,19 @@
   "category": "Forest of Arrays",
   "starterCode": {
     "javascript": "/**\n * @param {number[]} prices\n * @return {number}\n */\nfunction maxProfit(prices) {\n  // Your code here\n}",
-    "python": "def max_profit(prices):\n    \"\"\"\n    :type prices: List[int]\n    :rtype: int\n    \"\"\"\n    # Your code here\n    pass"
+    "python": "def max_profit(prices):\n    \"\"\"\n    :type prices: List[int]\n    :rtype: int\n    \"\"\"\n    # Your code here\n    pass",
+    "java": "class Solution {\n    public int maxProfit(int[] prices) {\n        // Your code here\n        return 0;\n    }\n}",
+    "cpp": "class Solution {\npublic:\n    int maxProfit(vector<int>& prices) {\n        // Your code here\n        return 0;\n    }\n};",
+    "go": "func maxProfit(prices []int) int {\n    // Your code here\n    return 0\n}",
+    "rust": "impl Solution {\n    pub fn max_profit(prices: Vec<i32>) -> i32 {\n        // Your code here\n        0\n    }\n}"
   },
   "solutionCode": {
     "javascript": "/**\n * @param {number[]} prices\n * @return {number}\n */\nfunction maxProfit(prices) {\n  let maxProfit = 0;\n  let minPrice = Infinity;\n  \n  for (let i = 0; i < prices.length; i++) {\n    if (prices[i] < minPrice) {\n      minPrice = prices[i];\n    } else if (prices[i] - minPrice > maxProfit) {\n      maxProfit = prices[i] - minPrice;\n    }\n  }\n  \n  return maxProfit;\n}",
-    "python": "def max_profit(prices):\n    max_profit = 0\n    min_price = float('inf')\n    \n    for price in prices:\n        if price < min_price:\n            min_price = price\n        elif price - min_price > max_profit:\n            max_profit = price - min_price\n    \n    return max_profit"
+    "python": "def max_profit(prices):\n    max_profit = 0\n    min_price = float('inf')\n    \n    for price in prices:\n        if price < min_price:\n            min_price = price\n        elif price - min_price > max_profit:\n            max_profit = price - min_price\n    \n    return max_profit",
+    "java": "class Solution {\n    public int maxProfit(int[] prices) {\n        int maxProfit = 0;\n        int minPrice = Integer.MAX_VALUE;\n        \n        for (int price : prices) {\n            if (price < minPrice) {\n                minPrice = price;\n            } else if (price - minPrice > maxProfit) {\n                maxProfit = price - minPrice;\n            }\n        }\n        \n        return maxProfit;\n    }\n}",
+    "cpp": "class Solution {\npublic:\n    int maxProfit(vector<int>& prices) {\n        int maxProfit = 0;\n        int minPrice = INT_MAX;\n        \n        for (int price : prices) {\n            if (price < minPrice) {\n                minPrice = price;\n            } else if (price - minPrice > maxProfit) {\n                maxProfit = price - minPrice;\n            }\n        }\n        \n        return maxProfit;\n    }\n};",
+    "go": "func maxProfit(prices []int) int {\n    maxProfit := 0\n    minPrice := int(^uint(0) >> 1) // Max int value\n    \n    for _, price := range prices {\n        if price < minPrice {\n            minPrice = price\n        } else if price - minPrice > maxProfit {\n            maxProfit = price - minPrice\n        }\n    }\n    \n    return maxProfit\n}",
+    "rust": "impl Solution {\n    pub fn max_profit(prices: Vec<i32>) -> i32 {\n        let mut max_profit = 0;\n        let mut min_price = i32::MAX;\n        \n        for price in prices {\n            if price < min_price {\n                min_price = price;\n            } else if price - min_price > max_profit {\n                max_profit = price - min_price;\n            }\n        }\n        \n        max_profit\n    }\n}"
   },
   "constraints": [
     "1 <= prices.length <= 10^5",

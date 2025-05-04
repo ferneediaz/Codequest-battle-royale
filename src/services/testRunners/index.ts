@@ -1,6 +1,12 @@
 import { LANGUAGE_IDS } from '../submissionService';
 import { generateJavaScriptTestRunner } from './javascript';
 import { generatePythonTestRunner } from './python';
+import { generateJavaTestRunner } from './java';
+import { generateCppTestRunner } from './cpp';
+import { generateCTestRunner } from './c';
+import { generateRubyTestRunner } from './ruby';
+import { generateGoTestRunner } from './go';
+import { generateRustTestRunner } from './rust';
 
 /**
  * Factory function to get the appropriate test runner for a language
@@ -14,6 +20,18 @@ export function getTestRunner(code: string, languageId: number): string {
       return generateJavaScriptTestRunner(code);
     case LANGUAGE_IDS.python:
       return generatePythonTestRunner(code);
+    case LANGUAGE_IDS.java:
+      return generateJavaTestRunner(code);
+    case LANGUAGE_IDS.cpp:
+      return generateCppTestRunner(code);
+    case LANGUAGE_IDS.c:
+      return generateCTestRunner(code);
+    case LANGUAGE_IDS.ruby:
+      return generateRubyTestRunner(code);
+    case LANGUAGE_IDS.go:
+      return generateGoTestRunner(code);
+    case LANGUAGE_IDS.rust:
+      return generateRustTestRunner(code);
     // Add additional languages here as they are implemented
     default:
       console.warn(`No test runner available for language ID ${languageId}, returning original code`);

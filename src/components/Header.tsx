@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
-import Logo from './Logo';
+import CodeQuestLogo from './CodeQuestLogo';
 
 const Header: React.FC = () => {
   const { user, signIn, signOut, loading: authLoading } = useAuth();
@@ -32,8 +32,12 @@ const Header: React.FC = () => {
       <div className="max-w-6xl mx-auto flex items-center justify-between relative">
         {/* Logo and navigation */}
         <div className="flex items-center">
-          <div className="h-10 w-10 cursor-pointer" onClick={() => navigate('/')}>
-            <Logo />
+          <div className="cursor-pointer" onClick={() => navigate('/')}>
+            <CodeQuestLogo 
+              iconSize={6} 
+              titleClassName="text-xl font-bold text-white" 
+              showIcons={false} 
+            />
           </div>
           <nav className="ml-6 hidden md:block">
             <ul className="flex space-x-4">
