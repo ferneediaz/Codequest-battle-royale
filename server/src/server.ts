@@ -15,9 +15,15 @@ const startServer = async () => {
   }
 
   app.listen(PORT, () => {
+    // Use proper base URL depending on environment
+    const isProduction = process.env.NODE_ENV === 'production';
+    const baseUrl = isProduction 
+      ? process.env.RENDER_EXTERNAL_URL || `https://codequest-battle-royale.onrender.com` 
+      : `http://localhost:${PORT}`;
+    
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`Health check available at: http://localhost:${PORT}/health`);
-    console.log(`API endpoints available at: http://localhost:${PORT}/api/*`);
+    console.log(`Health check available at: ${baseUrl}/health`);
+    console.log(`API endpoints available at: ${baseUrl}/api/*`);
   });
 };
 
