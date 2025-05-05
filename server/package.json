@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "nodemon",
     "dev:quick": "node run-server.mjs",
-    "build": "mkdir -p dist && cp -r src/* dist/ && find dist -name '*.ts' -exec bash -c 'mv \"$0\" \"${0%.ts}.js\"' {} \\;",
+    "build": "npx esbuild src/**/*.ts --outdir=dist --platform=node --format=esm --target=es2020",
     "start": "node dist/server.js",
     "test": "node src/test-client.mjs"
   },
