@@ -1,7 +1,7 @@
 import { TestCase, CodeProblem, BATTLE_CATEGORIES } from './problemService';
 
 // API URL - we'll use environment variables in a real app
-const API_URL = 'http://localhost:5000/api';
+const API_URL = 'https://codequest-battle-royale.onrender.com/api';
 
 class ApiProblemService {
   private problemsByCategory: Record<string, CodeProblem[]> = {};

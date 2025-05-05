@@ -55,6 +55,9 @@ export const testConnection = async () => {
       
       if (res.ok) {
         console.log('Direct fetch successful! Status:', res.status);
+        console.log('Available tables from REST endpoint:');
+        const tables = await res.json();
+        console.log(JSON.stringify(tables, null, 2));
       } else {
         console.warn('Direct fetch failed. Status:', res.status);
         console.warn('Response:', await res.text());
@@ -63,59 +66,48 @@ export const testConnection = async () => {
       console.warn('Direct fetch error:', fetchErr?.message);
     }
     
-    // List available tables
-    console.log('Attempting to list tables...');
+    // Try a very simple query for any table
+    console.log('Testing tables list via RPC...');
     try {
-      const { data: tables, error: tablesError } = await supabase
-        .from('pg_tables')
-        .select('tablename')
-        .eq('schemaname', 'public');
-        
-      if (tablesError) {
-        console.warn('Failed to list tables:', tablesError.message);
+      const { data, error } = await supabase.rpc('get_tables');
+      if (error) {
+        console.log('RPC failed:', error.message);
       } else {
-        console.log('Available tables:', tables?.map(t => t.tablename).join(', ') || 'No tables found');
+        console.log('Available tables:', data);
       }
     } catch (e: any) {
-      console.warn('Error listing tables:', e?.message);
+      console.log('RPC exception:', e?.message);
     }
     
-    // Test with a simple query that doesn't use the coding_problems table
-    console.log('Testing simple public query...');
+    // Try the most basic query possible
+    console.log('Attempting most basic query...');
     try {
-      const { data: testData, error: testError } = await supabase
-        .from('profiles')
-        .select('count(*)')
-        .limit(1)
-        .single();
+      const { data, error } = await supabase
+        .from('coding_problems')
+        .select('*')
+        .limit(1);
       
-      if (testError) {
-        console.log('Alternative table query failed:', testError.message);
+      if (error) {
+        console.warn('Basic query failed:', error.message);
+        console.warn('Error code:', error.code);
+        console.warn('Full error:', JSON.stringify(error));
+        return false;
       } else {
-        console.log('Alternative table query succeeded:', testData);
+        console.log('Basic query succeeded!');
+        console.log('Data:', data);
+        return true;
       }
-    } catch (e: any) {
-      console.warn('Error in alternative query:', e?.message);
-    }
-    
-    // Try a simple query on coding_problems
-    console.log('Testing coding_problems query...');
-    const { data, error } = await supabase
-      .from('coding_problems')
-      .select('count(*)', { count: 'exact', head: true });
-    
-    if (error) {
-      console.warn('Supabase coding_problems query failed:', error.message || 'No error message');
-      console.warn('Full error:', JSON.stringify(error, null, 2));
+    } catch (err: any) {
+      console.error('Exception during basic query:', err?.message || String(err));
+      console.error('Full error object:', JSON.stringify(err, null, 2));
       return false;
     }
-    
-    console.log('Successfully connected to Supabase!');
-    console.log('Query result:', data);
-    return true;
   } catch (err: any) {
     console.error('Error connecting to Supabase:', err?.message || String(err));
     console.error('Full error object:', JSON.stringify(err, null, 2));
     return false;
   }
-}; 
+};
+
+// API URL - we'll use environment variables in a real app
+const API_URL = 'http://localhost:5000/api'; 
