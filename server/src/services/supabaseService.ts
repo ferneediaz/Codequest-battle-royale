@@ -40,18 +40,22 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // Test the connection
 export const testConnection = async () => {
   try {
+    console.log(`Attempting connection with URL: ${supabaseUrl?.substring(0, 12)}...`);
+    console.log('Environment variables available:', Object.keys(process.env).filter(k => k.includes('SUPABASE')));
+    
     const { data, error } = await supabase
       .from('coding_problems')
       .select('count(*)', { count: 'exact', head: true });
     
     if (error) {
       console.warn('Supabase connection issue:', error.message);
+      console.warn('Full error:', JSON.stringify(error));
       return false;
     }
     
     console.log('Successfully connected to Supabase');
     return true;
-  } catch (err: any) {
+  } catch (err) {
     console.error('Error connecting to Supabase:', err?.message || err);
     return false;
   }
