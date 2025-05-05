@@ -107,7 +107,4 @@ export const testConnection = async () => {
     console.error('Full error object:', JSON.stringify(err, null, 2));
     return false;
   }
-};
-
-// API URL - we'll use environment variables in a real app
-const API_URL = 'http://localhost:5000/api'; 
+}; 
