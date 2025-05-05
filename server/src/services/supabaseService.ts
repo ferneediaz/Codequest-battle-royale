@@ -55,8 +55,8 @@ export const testConnection = async () => {
     
     console.log('Successfully connected to Supabase');
     return true;
-  } catch (err) {
-    console.error('Error connecting to Supabase:', err?.message || err);
+  } catch (err: any) {
+    console.error('Error connecting to Supabase:', err?.message || String(err));
     return false;
   }
 }; 
