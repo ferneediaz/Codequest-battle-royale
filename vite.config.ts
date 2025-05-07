@@ -4,7 +4,7 @@ import path from "path";
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: '/codequest-battle-royale/',
+  base: '/Codequest-battle-royale/',
   plugins: [react()],
   resolve: {
     alias: {
