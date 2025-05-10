@@ -42,7 +42,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await supabase.auth.signInWithOAuth({
       provider: provider,
       options: {
-        redirectTo: window.location.origin,
+        redirectTo: 'https://ferneediaz.github.io/Codequest-battle-royale/',
       },
     });
   };
