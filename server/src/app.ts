@@ -1,6 +1,7 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
 import cors from 'cors';
 import problemRoutes from './routes/problemRoutes.js';
+import judgeRoutes from './routes/judgeRoutes.js';
 
 const app = express();
 
@@ -10,9 +11,10 @@ app.use(express.json());
 
 // Routes
 app.use('/api/problems', problemRoutes);
+app.use('/api/judge', judgeRoutes);
 
 // Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Server is running' });
 });
 

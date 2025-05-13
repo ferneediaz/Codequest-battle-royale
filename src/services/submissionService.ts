@@ -137,24 +137,25 @@ export const JUDGE_STATUS = {
   MEMORY_LIMIT_EXCEEDED: 10
 };
 
-// Access the Judge0 API URL from environment variables only
-// Do NOT hardcode the URL for security reasons
-const JUDGE0_API_URL = import.meta.env.VITE_JUDGE0_API_URL ? import.meta.env.VITE_JUDGE0_API_URL.replace(/\/+$/, '') : '';
+// Access the server URL from environment variables
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:5000';
+// We no longer need Judge0 API URL directly, we'll use our server as a proxy
+// const JUDGE0_API_URL = import.meta.env.VITE_JUDGE0_API_URL ? import.meta.env.VITE_JUDGE0_API_URL.replace(/\/+$/, '') : '';
 const JUDGE0_API_KEY = import.meta.env.VITE_JUDGE0_API_KEY;
 const JUDGE0_API_HOST = import.meta.env.VITE_JUDGE0_API_HOST;
 
 // Log but don't expose the full URL
-console.log('JUDGE0 DEBUG - Judge0 API URL configured:', JUDGE0_API_URL ? 'Yes' : 'No');
+console.log('SUBMISSION SERVICE - Using server proxy at:', SERVER_URL);
 
 class SubmissionService {
   /**
-   * Submit code to Judge0 and get results
+   * Submit code to Judge0 through server proxy
    */
   async submitCode(submission: JudgeSubmission): Promise<JudgeResult> {
     try {
-      // Check if Judge0 is configured
-      if (!JUDGE0_API_URL) {
-        throw new Error('Judge0 API URL is not configured');
+      // Check if server is configured
+      if (!SERVER_URL) {
+        throw new Error('Server URL is not configured');
       }
       
       // Prepare code for submission by adding standard test runner
@@ -170,20 +171,13 @@ class SubmissionService {
         'Content-Type': 'application/json'
       };
       
-      // Only add RapidAPI headers if we're using the RapidAPI endpoint
-      if (JUDGE0_API_URL.includes('rapidapi.com') && JUDGE0_API_KEY) {
-        headers['X-RapidAPI-Key'] = JUDGE0_API_KEY;
-        headers['X-RapidAPI-Host'] = JUDGE0_API_HOST || '';
-      }
-      
       console.log('JUDGE0 DEBUG - Request headers:', JSON.stringify(headers));
-      
-      // Create a submission
-      console.log('JUDGE0 DEBUG - Sending request to:', `${JUDGE0_API_URL}/submissions`);
+      console.log('JUDGE0 DEBUG - Sending request to server proxy:', `${SERVER_URL}/api/judge/submissions`);
       
       let response;
       try {
-        response = await fetch(`${JUDGE0_API_URL}/submissions`, {
+        // Use our server proxy endpoint instead of direct Judge0 API
+        response = await fetch(`${SERVER_URL}/api/judge/submissions`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -192,8 +186,8 @@ class SubmissionService {
           })
         });
       } catch (fetchError) {
-        console.error('JUDGE0 DEBUG - Network error connecting to Judge0:', fetchError);
-        throw new Error(`Failed to connect to Judge0 API at ${JUDGE0_API_URL}: ${fetchError.message}`);
+        console.error('JUDGE0 DEBUG - Network error connecting to server proxy:', fetchError);
+        throw new Error(`Failed to connect to server proxy at ${SERVER_URL}: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
       }
       
       console.log('JUDGE0 DEBUG - Submission response status:', response.status);
@@ -227,7 +221,7 @@ class SubmissionService {
   }
   
   /**
-   * Get results of a previous submission
+   * Get results of a previous submission through server proxy
    */
   private async getSubmissionResult(token: string): Promise<JudgeResult> {
     try {
@@ -238,28 +232,25 @@ class SubmissionService {
       console.log('JUDGE0 DEBUG - Polling for results with token:', token);
       
       // Headers for the API request
-      const headers: Record<string, string> = {};
-      
-      // Only add RapidAPI headers if we're using the RapidAPI endpoint
-      if (JUDGE0_API_URL.includes('rapidapi.com') && JUDGE0_API_KEY) {
-        headers['X-RapidAPI-Key'] = JUDGE0_API_KEY;
-        headers['X-RapidAPI-Host'] = JUDGE0_API_HOST || '';
-      }
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
       
       // Poll for results with exponential backoff
       while (!result && attempts < maxAttempts) {
         console.log(`JUDGE0 DEBUG - Polling attempt ${attempts + 1}/${maxAttempts}`);
-        console.log('JUDGE0 DEBUG - Polling URL:', `${JUDGE0_API_URL}/submissions/${token}`);
+        console.log('JUDGE0 DEBUG - Polling URL:', `${SERVER_URL}/api/judge/submissions/${token}`);
         
         let response;
         try {
-          response = await fetch(`${JUDGE0_API_URL}/submissions/${token}`, {
+          // Use our server proxy endpoint instead of direct Judge0 API
+          response = await fetch(`${SERVER_URL}/api/judge/submissions/${token}`, {
             method: 'GET',
             headers
           });
         } catch (fetchError) {
-          console.error('JUDGE0 DEBUG - Network error polling Judge0:', fetchError);
-          throw new Error(`Failed to connect to Judge0 API at ${JUDGE0_API_URL}: ${fetchError.message}`);
+          console.error('JUDGE0 DEBUG - Network error polling server proxy:', fetchError);
+          throw new Error(`Failed to connect to server proxy at ${SERVER_URL}: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
         }
         
         console.log('JUDGE0 DEBUG - Poll response status:', response.status);
