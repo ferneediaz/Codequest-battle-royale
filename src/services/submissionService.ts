@@ -138,7 +138,7 @@ export const JUDGE_STATUS = {
 };
 
 // Access the Judge0 API URL from environment variables
-const JUDGE0_API_URL = import.meta.env.VITE_JUDGE0_API_URL || 'https://judge0-ce.p.rapidapi.com';
+const JUDGE0_API_URL = import.meta.env.VITE_JUDGE0_API_URL || 'https://judge0-production-07eb.up.railway.app';
 const JUDGE0_API_KEY = import.meta.env.VITE_JUDGE0_API_KEY;
 const JUDGE0_API_HOST = import.meta.env.VITE_JUDGE0_API_HOST;
 
@@ -166,8 +166,8 @@ class SubmissionService {
         'Content-Type': 'application/json'
       };
       
-      // Add API key headers if they exist
-      if (JUDGE0_API_KEY) {
+      // Only add RapidAPI headers if we're using the RapidAPI endpoint
+      if (JUDGE0_API_URL.includes('rapidapi.com') && JUDGE0_API_KEY) {
         headers['X-RapidAPI-Key'] = JUDGE0_API_KEY;
         headers['X-RapidAPI-Host'] = JUDGE0_API_HOST || '';
       }
@@ -228,8 +228,8 @@ class SubmissionService {
       // Headers for the API request
       const headers: Record<string, string> = {};
       
-      // Add API key headers if they exist
-      if (JUDGE0_API_KEY) {
+      // Only add RapidAPI headers if we're using the RapidAPI endpoint
+      if (JUDGE0_API_URL.includes('rapidapi.com') && JUDGE0_API_KEY) {
         headers['X-RapidAPI-Key'] = JUDGE0_API_KEY;
         headers['X-RapidAPI-Host'] = JUDGE0_API_HOST || '';
       }
