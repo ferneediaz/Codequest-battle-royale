@@ -137,10 +137,14 @@ export const JUDGE_STATUS = {
   MEMORY_LIMIT_EXCEEDED: 10
 };
 
-// Access the Judge0 API URL from environment variables
-const JUDGE0_API_URL = import.meta.env.VITE_JUDGE0_API_URL || 'https://judge0-production-07eb.up.railway.app';
+// Access the Judge0 API URL from environment variables only
+// Do NOT hardcode the URL for security reasons
+const JUDGE0_API_URL = import.meta.env.VITE_JUDGE0_API_URL ? import.meta.env.VITE_JUDGE0_API_URL.replace(/\/+$/, '') : '';
 const JUDGE0_API_KEY = import.meta.env.VITE_JUDGE0_API_KEY;
 const JUDGE0_API_HOST = import.meta.env.VITE_JUDGE0_API_HOST;
+
+// Log but don't expose the full URL
+console.log('JUDGE0 DEBUG - Judge0 API URL configured:', JUDGE0_API_URL ? 'Yes' : 'No');
 
 class SubmissionService {
   /**
@@ -175,14 +179,22 @@ class SubmissionService {
       console.log('JUDGE0 DEBUG - Request headers:', JSON.stringify(headers));
       
       // Create a submission
-      const response = await fetch(`${JUDGE0_API_URL}/submissions`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          ...submission,
-          source_code: modifiedCode
-        })
-      });
+      console.log('JUDGE0 DEBUG - Sending request to:', `${JUDGE0_API_URL}/submissions`);
+      
+      let response;
+      try {
+        response = await fetch(`${JUDGE0_API_URL}/submissions`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            ...submission,
+            source_code: modifiedCode
+          })
+        });
+      } catch (fetchError) {
+        console.error('JUDGE0 DEBUG - Network error connecting to Judge0:', fetchError);
+        throw new Error(`Failed to connect to Judge0 API at ${JUDGE0_API_URL}: ${fetchError.message}`);
+      }
       
       console.log('JUDGE0 DEBUG - Submission response status:', response.status);
       
@@ -237,11 +249,18 @@ class SubmissionService {
       // Poll for results with exponential backoff
       while (!result && attempts < maxAttempts) {
         console.log(`JUDGE0 DEBUG - Polling attempt ${attempts + 1}/${maxAttempts}`);
+        console.log('JUDGE0 DEBUG - Polling URL:', `${JUDGE0_API_URL}/submissions/${token}`);
         
-        const response = await fetch(`${JUDGE0_API_URL}/submissions/${token}`, {
-          method: 'GET',
-          headers
-        });
+        let response;
+        try {
+          response = await fetch(`${JUDGE0_API_URL}/submissions/${token}`, {
+            method: 'GET',
+            headers
+          });
+        } catch (fetchError) {
+          console.error('JUDGE0 DEBUG - Network error polling Judge0:', fetchError);
+          throw new Error(`Failed to connect to Judge0 API at ${JUDGE0_API_URL}: ${fetchError.message}`);
+        }
         
         console.log('JUDGE0 DEBUG - Poll response status:', response.status);
         
