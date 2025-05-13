@@ -9,7 +9,9 @@ export class JudgeService {
   constructor(apiUrl?: string) {
     this.apiUrl = apiUrl || process.env.JUDGE0_API_URL || '';
     if (!this.apiUrl) {
-      console.warn('⚠️ Warning: Judge0 API URL is not configured. Set JUDGE0_API_URL environment variable.');
+      console.warn('⚠️ WARNING: Judge0 API URL is NOT CONFIGURED in server environment. Set JUDGE0_API_URL.');
+    } else {
+      console.log(`✅ SERVER PROXY: Judge0 API URL configured to: ${this.apiUrl}`);
     }
   }
 
