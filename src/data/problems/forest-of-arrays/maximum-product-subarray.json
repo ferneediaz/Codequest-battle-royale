@@ -53,17 +53,17 @@
     {
       "input": "[-2,-3,-4]",
       "output": "12",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "[2,-5,-2,-4,3]",
       "output": "24",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "[-2,3,-4]",
       "output": "24",
-      "isHidden": true
+      "isHidden": false
     }
   ],
   "timeLimit": 1000,

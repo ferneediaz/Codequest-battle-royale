@@ -53,17 +53,17 @@
     {
       "input": "\"banana\"",
       "output": "\"anana\"",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "\"aacabdkacaa\"",
       "output": "\"aca\"",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "\"abcdefgfedcba\"",
       "output": "\"abcdefgfedcba\"",
-      "isHidden": true
+      "isHidden": false
     }
   ],
   "timeLimit": 1000,

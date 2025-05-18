@@ -49,12 +49,12 @@
     {
       "input": "[\"cab\",\"tin\",\"pew\",\"duh\",\"may\",\"ill\",\"buy\",\"bar\",\"max\",\"doc\"]",
       "output": "[[\"cab\"],[\"tin\"],[\"pew\"],[\"duh\"],[\"may\"],[\"ill\"],[\"buy\"],[\"bar\"],[\"max\"],[\"doc\"]]",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "[\"abc\",\"cba\",\"bac\",\"foo\",\"bar\"]",
       "output": "[[\"abc\",\"cba\",\"bac\"],[\"foo\"],[\"bar\"]]",
-      "isHidden": true
+      "isHidden": false
     }
   ],
   "timeLimit": 1000,

@@ -54,12 +54,12 @@
     {
       "input": "[[-1,0,3,5,9,12], -1]",
       "output": "0",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "[[1,2,3,4,5,6,7,8,9,10], 8]",
       "output": "7",
-      "isHidden": true
+      "isHidden": false
     }
   ],
   "timeLimit": 1000,

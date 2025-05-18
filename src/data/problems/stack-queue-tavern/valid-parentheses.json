@@ -58,12 +58,12 @@
     {
       "input": "\"(({[]}))\"",
       "output": "true",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "\"(()\"",
       "output": "false",
-      "isHidden": true
+      "isHidden": false
     }
   ],
   "timeLimit": 1000,

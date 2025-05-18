@@ -52,12 +52,12 @@
     {
       "input": "\"aacc\", \"ccac\"",
       "output": "false",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "\"listen\", \"silent\"",
       "output": "true",
-      "isHidden": true
+      "isHidden": false
     }
   ],
   "timeLimit": 1000,

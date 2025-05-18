@@ -56,12 +56,12 @@
     {
       "input": "[1,2,3,0,0,0,0,0], 3, [4,5,6,7,8], 5",
       "output": "[1,2,3,4,5,6,7,8]",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "[1,3,5,7,0,0,0,0], 4, [2,4,6,8], 4",
       "output": "[1,2,3,4,5,6,7,8]",
-      "isHidden": true
+      "isHidden": false
     }
   ],
   "timeLimit": 1000,

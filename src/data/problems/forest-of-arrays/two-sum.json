@@ -55,12 +55,12 @@
     {
       "input": "[[-1,-2,-3,-4,-5], -8]",
       "output": "[2,4]",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "[[0,4,3,0], 0]",
       "output": "[0,3]",
-      "isHidden": true
+      "isHidden": false
     }
   ],
   "timeLimit": 1000,

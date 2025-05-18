@@ -53,12 +53,12 @@
     {
       "input": "[1,2,3]",
       "output": "[3,2,1]",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "[5,4,3,2,1]",
       "output": "[1,2,3,4,5]",
-      "isHidden": true
+      "isHidden": false
     }
   ],
   "timeLimit": 1000,

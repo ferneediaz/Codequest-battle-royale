@@ -52,17 +52,17 @@
     {
       "input": "\"abba\"",
       "output": "6",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "\"madam\"",
       "output": "7",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "\"aaaaa\"",
       "output": "15",
-      "isHidden": true
+      "isHidden": false
     }
   ],
   "timeLimit": 1000,

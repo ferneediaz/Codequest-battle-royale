@@ -53,12 +53,12 @@
     {
       "input": "\"Was it a car or a cat I saw?\"",
       "output": "true",
-      "isHidden": true
+      "isHidden": false
     },
     {
       "input": "\"No 'x' in Nixon\"",
       "output": "true",
-      "isHidden": true
+      "isHidden": false
     }
   ],
   "timeLimit": 1000,

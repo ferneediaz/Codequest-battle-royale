@@ -10,9 +10,15 @@ services:
     image: judge0/judge0:1.13.1
     volumes:
       - ./judge0.conf:/judge0.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "2358:2358"
     privileged: true
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
     <<: *default-logging
     restart: always
 
@@ -21,7 +27,13 @@ services:
     command: ["./scripts/workers"]
     volumes:
       - ./judge0.conf:/judge0.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     privileged: true
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
     <<: *default-logging
     restart: always
 
