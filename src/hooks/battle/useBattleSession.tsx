@@ -20,13 +20,17 @@ export const useBattleSession = (user: any) => {
   const hasInitializedRef = useRef(false);
   
   // Initialize the battle session
-  const initializeSession = async () => {
+  const initializeSession = async (customSessionId?: string) => {
     setIsJoining(true);
     setDebugMsg('Connecting to battle arena...');
+    
+    // Set the session ID, either custom or default
+    const activeSessionId = customSessionId || 'default-battle-session';
+    setSessionId(activeSessionId);
 
     try {
       // First check if we have a valid session
-      if (sessionId) {
+      if (sessionId === activeSessionId) {
         console.log('Session already exists:', sessionId);
         setIsJoining(false);
         return;
@@ -37,24 +41,116 @@ export const useBattleSession = (user: any) => {
         try {
           console.log('Connecting user:', user.email);
           
-          // Join battle using the battle service
-          const session = await battleService.joinBattle(user.email);
-          
-          if (session) {
-            console.log('Successfully connected:', session);
-            const connectedEmails = session.connected_emails || [];
-            setSessionId('default-battle-session');
-            setConnectedUsers(connectedEmails);
-            setPlayerCount(connectedEmails.length);
-            setSetupStatus('verified');
+          // Check if the session exists
+          const { data: existingSession, error: fetchError } = await supabase
+            .from('battle_sessions')
+            .select('*')
+            .eq('id', activeSessionId)
+            .single();
             
-            setDebugMsg(connectedEmails.length > 1 ? 
-              `Connected with ${connectedEmails.length} warriors!` : 
-              'Connected! Waiting for other warriors...');
+          if (fetchError && fetchError.code !== 'PGRST116') {
+            console.error('Error checking for session:', fetchError.message);
+            setDebugMsg(`Error connecting: ${fetchError.message}`);
+            setIsJoining(false);
+            return null;
+          }
+          
+          if (existingSession) {
+            console.log('Found existing session:', existingSession);
+            // Update the existing session to add this user
+            
+            // Get the current list of emails, ensuring it's not null
+            let connectedEmails = Array.isArray(existingSession.connected_emails) 
+              ? existingSession.connected_emails 
+              : [];
+
+            // Remove any stale entries of this user
+            connectedEmails = connectedEmails.filter((email: string) => email !== user.email);
+
+            // Add the new user email
+            connectedEmails.push(user.email);
+            console.log('Updated connected users:', connectedEmails);
+            
+            // Update ready users - remove this user from ready list when joining
+            let readyUsers = Array.isArray(existingSession.ready_users) 
+              ? [...existingSession.ready_users]
+              : [];
               
-            return session;
+            // Remove the joining user from ready_users
+            readyUsers = readyUsers.filter((email: string) => email !== user.email);
+            
+            const { data: updatedSession, error: updateError } = await supabase
+              .from('battle_sessions')
+              .update({ 
+                active_users: connectedEmails.length,
+                connected_emails: connectedEmails,
+                ready_users: readyUsers,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', activeSessionId)
+              .select()
+              .single();
+            
+            if (updateError) {
+              console.error('Error updating session:', updateError.message);
+              setDebugMsg(`Error connecting: ${updateError.message}`);
+              setIsJoining(false);
+              return null;
+            }
+            
+            if (updatedSession) {
+              setBattleState(updatedSession.battle_state as BattleState || 'topic_selection');
+              setConnectedUsers(connectedEmails);
+              setPlayerCount(connectedEmails.length);
+              setSetupStatus('verified');
+              
+              setDebugMsg(connectedEmails.length > 1 ? 
+                `Connected with ${connectedEmails.length} warriors!` : 
+                'Connected! Waiting for other warriors...');
+                
+              setIsJoining(false);
+              return updatedSession;
+            }
           } else {
-            setDebugMsg('Error connecting to battle. Try again.');
+            // Create a new session
+            console.log('Creating new session with ID:', activeSessionId);
+            const initialEmails = [user.email];
+            
+            const { data: newSession, error: insertError } = await supabase
+              .from('battle_sessions')
+              .insert({
+                id: activeSessionId,
+                active_users: 1,
+                is_active: false,
+                round: 1,
+                time_remaining: 300,
+                current_category: 'Binary Search Castle',
+                connected_emails: initialEmails,
+                ready_users: [], // Initialize with empty ready_users array
+                battle_state: 'topic_selection',
+                updated_at: new Date().toISOString()
+              })
+              .select()
+              .single();
+              
+            if (insertError) {
+              console.error('Error creating session:', insertError.message);
+              setDebugMsg(`Error creating room: ${insertError.message}`);
+              setIsJoining(false);
+              return null;
+            }
+            
+            if (newSession) {
+              console.log('Created new session:', newSession);
+              setConnectedUsers(initialEmails);
+              setPlayerCount(1);
+              setSetupStatus('verified');
+              
+              setDebugMsg('Room created! Waiting for warriors to join...');
+              
+              setIsJoining(false);
+              return newSession;
+            }
           }
         } catch (err: any) {
           console.error('Connection error:', err);
@@ -82,7 +178,7 @@ export const useBattleSession = (user: any) => {
     // Function to send a heartbeat
     const sendHeartbeat = async () => {
       try {
-        console.log('Sending heartbeat...');
+        console.log(`Sending heartbeat for session ${sessionId}...`);
         lastHeartbeatRef.current = Date.now();
         
         // Try-catch each database operation to prevent chain failures
@@ -95,7 +191,7 @@ export const useBattleSession = (user: any) => {
             .single();
             
           if (error) {
-            console.error('Error fetching session for heartbeat:', error);
+            console.error(`Error fetching session ${sessionId} for heartbeat:`, error);
             return;
           }
           
@@ -168,7 +264,7 @@ export const useBattleSession = (user: any) => {
   
   // Handle leaving the session
   const leaveSession = async () => {
-    if (!user?.email) return;
+    if (!user?.email || !sessionId) return;
     
     setDebugMsg('Leaving battle arena...');
     try {
@@ -176,7 +272,7 @@ export const useBattleSession = (user: any) => {
       const { data: session } = await supabase
         .from('battle_sessions')
         .select('connected_emails')
-        .eq('id', 'default-battle-session')
+        .eq('id', sessionId)
         .single();
         
       if (session && session.connected_emails) {
@@ -197,17 +293,12 @@ export const useBattleSession = (user: any) => {
             last_left: user.email,
             last_left_at: new Date().toISOString()
           })
-          .eq('id', 'default-battle-session');
+          .eq('id', sessionId);
           
         console.log('Successfully removed user from session');
       } else {
         console.log('Session not found when trying to leave');
       }
-      
-      // For backward compatibility, also call the battleService methods
-      await battleService.leaveBattle(user.email);
-      await battleService.syncUserCount();
-      console.log('Successfully left battle');
       
       return true;
     } catch (e) {
@@ -218,6 +309,8 @@ export const useBattleSession = (user: any) => {
   
   // Change battle state
   const changeBattleState = async (newState: BattleState) => {
+    if (!sessionId) return false;
+    
     try {
       // Update battle state in database
       const { error: updateError } = await supabase
@@ -228,7 +321,7 @@ export const useBattleSession = (user: any) => {
           last_state_change: new Date().toISOString(),
           state_changed_by: user?.email
         })
-        .eq('id', 'default-battle-session');
+        .eq('id', sessionId);
         
       if (updateError) {
         console.error('Error updating battle state:', updateError);

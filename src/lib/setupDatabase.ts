@@ -531,4 +531,85 @@ export const cleanupStaleReadyStates = async (): Promise<void> => {
   } catch (error) {
     console.error('Error cleaning up stale ready states:', error);
   }
-}; 
+};
+
+// Function to create the battle_rooms table
+const createBattleRoomsTable = async () => {
+  try {
+    console.log('Creating battle_rooms table if not exists...');
+    
+    const { error } = await supabase.rpc('execute_sql', {
+      sql_query: `
+        CREATE TABLE IF NOT EXISTS battle_rooms (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          created_by TEXT,
+          created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          game_mode TEXT NOT NULL DEFAULT 'battle_royale',
+          player_limit INTEGER DEFAULT 10,
+          min_players INTEGER DEFAULT 2,
+          time_limit INTEGER DEFAULT 600
+        );
+        
+        -- Enable row level security
+        ALTER TABLE public.battle_rooms ENABLE ROW LEVEL SECURITY;
+        
+        -- Make sure the table is included in the public schema
+        GRANT ALL ON public.battle_rooms TO anon, authenticated;
+        
+        -- Create a policy to allow all users to read battle_rooms
+        DROP POLICY IF EXISTS "Allow all users to read battle_rooms" ON public.battle_rooms;
+        CREATE POLICY "Allow all users to read battle_rooms"
+          ON public.battle_rooms
+          FOR SELECT
+          USING (true);
+        
+        -- Create a policy to allow all users to update battle_rooms
+        DROP POLICY IF EXISTS "Allow all users to update battle_rooms" ON public.battle_rooms;
+        CREATE POLICY "Allow all users to update battle_rooms"
+          ON public.battle_rooms
+          FOR UPDATE
+          USING (true)
+          WITH CHECK (true);
+        
+        -- Create a policy to allow all users to insert into battle_rooms
+        DROP POLICY IF EXISTS "Allow all users to insert into battle_rooms" ON public.battle_rooms;
+        CREATE POLICY "Allow all users to insert into battle_rooms"
+          ON public.battle_rooms
+          FOR INSERT
+          WITH CHECK (true);
+      `
+    });
+    
+    if (error) {
+      console.error('Error creating battle_rooms table:', error);
+      throw error;
+    }
+    
+    console.log('Battle rooms table created or already exists');
+    return true;
+  } catch (error) {
+    console.error('Failed to create battle_rooms table:', error);
+    throw error;
+  }
+};
+
+// Main setup function
+export async function setupDatabase() {
+  try {
+    console.log('Starting database setup...');
+    
+    // Create tables
+    await setupBattleSessionsTable();
+    await setupCodingProblemsTable();
+    await createBattleRoomsTable(); // Add the new table creation
+    
+    console.log('Database setup completed!');
+    return true;
+  } catch (error) {
+    console.error('Database setup failed:', error);
+    throw error;
+  }
+} 

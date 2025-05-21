@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabase';
 
 interface BattleSessionListenerProps {
   userEmail: string | undefined;
+  sessionId?: string | null;
   setConnectedUsers: (users: string[]) => void;
   setPlayerCount: (count: number) => void;
   setReadyUsers: (users: string[]) => void;
@@ -15,6 +16,7 @@ interface BattleSessionListenerProps {
 
 const BattleSessionListener: React.FC<BattleSessionListenerProps> = ({
   userEmail,
+  sessionId = 'default-battle-session',
   setConnectedUsers,
   setPlayerCount,
   setReadyUsers,
@@ -24,7 +26,7 @@ const BattleSessionListener: React.FC<BattleSessionListenerProps> = ({
   useEffect(() => {
     if (!userEmail) return;
     
-    console.log('🔄 Battle session listener: setting up subscription');
+    console.log(`🔄 Battle session listener: setting up subscription for ${sessionId}`);
     
     // Subscribe to battle session changes
     const unsubscribe = battleService.subscribeToSession((session: BattleSession) => {
@@ -66,35 +68,44 @@ const BattleSessionListener: React.FC<BattleSessionListenerProps> = ({
         // Get the topic selections
         const topicSelections = session.topic_selections || {};
         
+        console.log('🔄 Battle session update:', sessionId);
+        console.log('🔄 Connected users:', connectedEmails);
+        console.log('🔄 Raw ready users list:', readyList);
+        console.log('🔄 Topic selections:', topicSelections);
+        
         // A user is only truly ready if:
         // 1. They are in the ready_users list AND
-        // 2. They are still connected AND
-        // 3. They have selected exactly 2 topics
+        // 2. They are still connected
+        // Relaxing the topic selection requirement to be more lenient
         const validReadyUsers = readyList.filter(email => 
-          connectedEmails.includes(email) && // Still connected
-          topicSelections[email] && // Has topic selections
-          Array.isArray(topicSelections[email]) && // Topic selections is an array
-          topicSelections[email].length === 2 // Has selected exactly 2 topics
+          connectedEmails.includes(email)  // Still connected
         );
         
-        console.log('🔄 Updating ready users with strict validation:', validReadyUsers);
-        console.log('   Original ready users:', readyList);
-        console.log('   Filtered out:', readyList.filter(email => !validReadyUsers.includes(email)));
+        console.log('🔄 Validated ready users:', validReadyUsers);
+        
+        // Log users who failed validation
+        const invalidReadyUsers = readyList.filter(email => !validReadyUsers.includes(email));
+        if (invalidReadyUsers.length > 0) {
+          console.log('🔄 Users failed ready validation:', invalidReadyUsers);
+        }
         
         // Update local state with validated ready users
         setReadyUsers(validReadyUsers);
         
-        // Find users who are ready without topic selections
-        const incorrectlyReadyUsers = readyList.filter(email => 
-          connectedEmails.includes(email) && 
-          (!topicSelections[email] || 
-           !Array.isArray(topicSelections[email]) || 
-           topicSelections[email].length !== 2)
-        );
+        // Find users who are connected but not ready
+        const notReadyUsers = connectedEmails.filter(email => !validReadyUsers.includes(email));
+        if (notReadyUsers.length > 0) {
+          console.log('🔄 Connected users who are not ready:', notReadyUsers);
+        } else if (validReadyUsers.length > 0) {
+          console.log('🔄 All connected users are ready!');
+        }
+        
+        // Only perform database corrections if truly needed
+        const needsDatabaseCorrection = readyList.some(email => !validReadyUsers.includes(email));
         
         // If any users are incorrectly marked as ready, fix the database
-        if (incorrectlyReadyUsers.length > 0) {
-          console.warn('⚠️ CRITICAL: Users incorrectly marked as ready:', incorrectlyReadyUsers);
+        if (needsDatabaseCorrection) {
+          console.warn('⚠️ Correcting invalid ready status in database');
           
           // Immediately remove these users from the ready_users list in the database
           (async () => {
@@ -106,7 +117,7 @@ const BattleSessionListener: React.FC<BattleSessionListenerProps> = ({
                   ready_users: validReadyUsers,
                   updated_at: new Date().toISOString()
                 })
-                .eq('id', 'default-battle-session');
+                .eq('id', sessionId);
                 
               console.log('✅ Fixed incorrect ready status in database');
             } catch (error) {
@@ -151,14 +162,14 @@ const BattleSessionListener: React.FC<BattleSessionListenerProps> = ({
           setSelectedTopics(userTopics);
         }
       }
-    });
+    }, sessionId);
     
     // Clean up subscription on unmount
     return () => {
-      console.log('🔄 Battle session listener: cleaning up subscription');
+      console.log(`🔄 Battle session listener: cleaning up subscription for ${sessionId}`);
       unsubscribe();
     };
-  }, [userEmail, setConnectedUsers, setPlayerCount, setReadyUsers, setSelectedTopics, setTopicSelections]);
+  }, [userEmail, sessionId, setConnectedUsers, setPlayerCount, setReadyUsers, setSelectedTopics, setTopicSelections]);
   
   // Add an additional effect to clean up stale users
   useEffect(() => {
@@ -171,11 +182,11 @@ const BattleSessionListener: React.FC<BattleSessionListenerProps> = ({
         const { data: session, error } = await supabase
           .from('battle_sessions')
           .select('connected_emails, updated_at')
-          .eq('id', 'default-battle-session')
+          .eq('id', sessionId)
           .single();
           
         if (error) {
-          console.error('Error fetching session for stale check:', error);
+          console.error(`Error fetching session ${sessionId} for stale check:`, error);
           return;
         }
         
@@ -197,7 +208,7 @@ const BattleSessionListener: React.FC<BattleSessionListenerProps> = ({
                   active_users: updatedEmails.length,
                   updated_at: new Date().toISOString()
                 })
-                .eq('id', 'default-battle-session');
+                .eq('id', sessionId);
                 
               console.log('Successfully re-added to user list');
             } catch (err) {
@@ -221,7 +232,7 @@ const BattleSessionListener: React.FC<BattleSessionListenerProps> = ({
             
             // Refresh battle session data
             try {
-              await battleService.syncUserCount();
+              await battleService.syncUserCount(sessionId);
               console.log('Refreshed session data');
             } catch (err) {
               console.error('Error refreshing session data:', err);
@@ -242,7 +253,71 @@ const BattleSessionListener: React.FC<BattleSessionListenerProps> = ({
     return () => {
       clearInterval(intervalId);
     };
-  }, [userEmail]);
+  }, [userEmail, sessionId]);
+  
+  // Add an additional effect specifically for ready state reconciliation
+  useEffect(() => {
+    if (!userEmail || !sessionId) return;
+    
+    // Function to check and reconcile ready state
+    const syncReadyState = async () => {
+      console.log(`🔄 Reconciling ready state for session ${sessionId}`);
+      
+      try {
+        // Get current session data
+        const { data: session, error } = await supabase
+          .from('battle_sessions')
+          .select('ready_users, connected_emails, topic_selections')
+          .eq('id', sessionId)
+          .single();
+          
+        if (error) {
+          console.error('Error fetching session for ready state reconciliation:', error);
+          return;
+        }
+        
+        if (session) {
+          // Get current values
+          const readyList = Array.isArray(session.ready_users) ? session.ready_users : [];
+          const connectedEmails = Array.isArray(session.connected_emails) ? session.connected_emails : [];
+          
+          // Verify that user is properly represented in both lists
+          const isConnected = connectedEmails.includes(userEmail);
+          
+          // If we're supposed to be connected but aren't
+          if (!isConnected && userEmail) {
+            console.log('🛠️ Correcting connection status - adding user to connected_emails');
+            
+            try {
+              const updatedConnectedEmails = [...connectedEmails, userEmail];
+              await supabase
+                .from('battle_sessions')
+                .update({ 
+                  connected_emails: updatedConnectedEmails,
+                  active_users: updatedConnectedEmails.length,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', sessionId);
+            } catch (err) {
+              console.error('Error updating connection status:', err);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Error in ready state reconciliation:', err);
+      }
+    };
+    
+    // Initial sync
+    syncReadyState();
+    
+    // Set up interval for periodic checks
+    const intervalId = setInterval(syncReadyState, 5000); // Every 5 seconds
+    
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [userEmail, sessionId, setReadyUsers]);
   
   // This component doesn't render anything
   return null;

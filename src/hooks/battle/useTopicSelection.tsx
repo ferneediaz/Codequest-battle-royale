@@ -45,10 +45,22 @@ export const useTopicSelection = (user: any) => {
         // Use an async function to handle the database update
         const updateReadyUsers = async () => {
           try {
+            // Get the current sessionId from URL
+            const pathParts = window.location.pathname.split('/');
+            // Look for "battle" in the path and get the next segment
+            const roomIndex = pathParts.findIndex(part => part === 'battle');
+            const roomId = roomIndex >= 0 && roomIndex + 1 < pathParts.length ? 
+                pathParts[roomIndex + 1] : null;
+                
+            // Construct the session ID - might be a room ID or default session
+            const sessionId = roomId ? `room_${roomId}` : 'default-battle-session';
+            
+            console.log("Using session ID for topic selection:", sessionId);
+            
             const { data } = await supabase
               .from('battle_sessions')
               .select('ready_users')
-              .eq('id', 'default-battle-session')
+              .eq('id', sessionId)
               .single();
               
             if (data?.ready_users) {
@@ -58,7 +70,7 @@ export const useTopicSelection = (user: any) => {
               await supabase
                 .from('battle_sessions')
                 .update({ ready_users: filteredUsers })
-                .eq('id', 'default-battle-session');
+                .eq('id', sessionId);
                 
               console.log('Removed user from ready list after topic change');
             }
@@ -87,11 +99,23 @@ export const useTopicSelection = (user: any) => {
     setDebugMsg(`Ready for battle with topics: ${selectedTopics.join(' & ')}`);
     
     try {
+      // Get the current sessionId from URL
+      const pathParts = window.location.pathname.split('/');
+      // Look for "battle" in the path and get the next segment
+      const roomIndex = pathParts.findIndex(part => part === 'battle');
+      const roomId = roomIndex >= 0 && roomIndex + 1 < pathParts.length ? 
+          pathParts[roomIndex + 1] : null;
+          
+      // Construct the session ID - might be a room ID or default session
+      const sessionId = roomId ? `room_${roomId}` : 'default-battle-session';
+      
+      console.log("Using session ID for ready state:", sessionId);
+      
       // Get current session data
       const { data: currentSession, error: fetchError } = await supabase
         .from('battle_sessions')
         .select('ready_users, topic_selections')
-        .eq('id', 'default-battle-session')
+        .eq('id', sessionId)
         .single();
 
       if (fetchError) {
@@ -137,7 +161,7 @@ export const useTopicSelection = (user: any) => {
           topic_selections: updatedTopicSelections,
           updated_at: new Date().toISOString()
         })
-        .eq('id', 'default-battle-session');
+        .eq('id', sessionId);
           
       if (updateError) {
         console.error(`Error updating session:`, updateError);
@@ -146,6 +170,7 @@ export const useTopicSelection = (user: any) => {
       }
       
       console.log('User marked as ready:', user.email);
+      console.log('Current ready users:', updatedReadyUsers);
       return true;
     } catch (error) {
       console.error('Error setting up readiness:', error);
@@ -165,11 +190,23 @@ export const useTopicSelection = (user: any) => {
     // Also remove user from ready list in database
     if (user?.email) {
       try {
+        // Get the current sessionId from URL
+        const pathParts = window.location.pathname.split('/');
+        // Look for "battle" in the path and get the next segment
+        const roomIndex = pathParts.findIndex(part => part === 'battle');
+        const roomId = roomIndex >= 0 && roomIndex + 1 < pathParts.length ? 
+            pathParts[roomIndex + 1] : null;
+            
+        // Construct the session ID - might be a room ID or default session
+        const sessionId = roomId ? `room_${roomId}` : 'default-battle-session';
+        
+        console.log("Using session ID for changing topics:", sessionId);
+        
         // First get current ready users
         const { data: session } = await supabase
           .from('battle_sessions')
           .select('ready_users')
-          .eq('id', 'default-battle-session')
+          .eq('id', sessionId)
           .single();
           
         if (session && session.ready_users) {
@@ -188,9 +225,10 @@ export const useTopicSelection = (user: any) => {
               ready_users: updatedReadyUsers,
               updated_at: new Date().toISOString()
             })
-            .eq('id', 'default-battle-session');
+            .eq('id', sessionId);
             
           console.log('User marked as not ready after changing topics');
+          console.log('Current ready users:', updatedReadyUsers);
         }
       } catch (err) {
         console.error('Error updating ready status:', err);
@@ -205,11 +243,23 @@ export const useTopicSelection = (user: any) => {
     try {
       setDebugMsg('Transitioning to battle room...');
       
+      // Get the current sessionId from URL
+      const pathParts = window.location.pathname.split('/');
+      // Look for "battle" in the path and get the next segment
+      const roomIndex = pathParts.findIndex(part => part === 'battle');
+      const roomId = roomIndex >= 0 && roomIndex + 1 < pathParts.length ? 
+          pathParts[roomIndex + 1] : null;
+          
+      // Construct the session ID - might be a room ID or default session
+      const sessionId = roomId ? `room_${roomId}` : 'default-battle-session';
+      
+      console.log("Using session ID for entering battle room:", sessionId);
+      
       // Get current session state first
       const { data: currentSession } = await supabase
         .from('battle_sessions')
         .select('ready_users, connected_emails, topic_selections')
-        .eq('id', 'default-battle-session')
+        .eq('id', sessionId)
         .single();
 
       if (!currentSession) {
@@ -223,11 +273,27 @@ export const useTopicSelection = (user: any) => {
       const readyUsers = Array.isArray(currentSession.ready_users) 
         ? currentSession.ready_users 
         : [];
+        
+      console.log("Connected emails:", connectedEmails);
+      console.log("Ready users:", readyUsers);
 
-      // Verify all users are still ready
-      if (readyUsers.length !== connectedEmails.length || connectedEmails.length < 2) {
-        setDebugMsg('Error: Not all users are ready');
+      // Better validation logic - handle multiple scenarios
+      if (connectedEmails.length < 2) {
+        setDebugMsg('Error: Need at least 2 players to start');
         return false;
+      }
+      
+      // Check if all connected users are ready
+      const notReadyUsers = connectedEmails.filter(email => !readyUsers.includes(email));
+      if (notReadyUsers.length > 0) {
+        console.log("Users not ready:", notReadyUsers);
+        setDebugMsg(`Error: Not all users are ready (${notReadyUsers.join(', ')})`);
+        return false;
+      }
+      
+      // Special case - mark users ready if local state is out of sync
+      if (readyUsers.length >= connectedEmails.length) {
+        console.log("All users appear to be ready in database");
       }
 
       // IMPORTANT: Ensure we're using the correct topic selections before transitioning
@@ -248,25 +314,25 @@ export const useTopicSelection = (user: any) => {
         .update({ 
           battle_state: 'battle_room',
           updated_at: new Date().toISOString(),
-          last_state_change: new Date().toISOString(),
-          state_changed_by: user?.email
         })
-        .eq('id', 'default-battle-session');
+        .eq('id', sessionId);
         
       if (updateError) {
-        console.error('Error updating battle state:', updateError);
-        setDebugMsg('Error starting battle: ' + updateError.message);
+        console.error(`Error updating battle state:`, updateError);
+        setDebugMsg('Error transitioning to battle');
         return false;
       }
-
-      // Call the provided callback to update battle state in parent component
+      
+      // Update local battle state
       onBattleStateChange('battle_room');
       
-      setDebugMsg('Successfully entered battle room!');
+      // Hide topic selection UI
+      setShowTopicSelection(false);
+      
       return true;
-    } catch (err) {
-      console.error('Error transitioning to battle room:', err);
-      setDebugMsg('Error entering battle room. Please try again.');
+    } catch (error) {
+      console.error('Error transitioning to battle:', error);
+      setDebugMsg('Error transitioning to battle room');
       return false;
     }
   };

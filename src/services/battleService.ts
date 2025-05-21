@@ -197,17 +197,17 @@ export const battleService = {
   },
 
   // Sync connected users with count
-  async syncUserCount(): Promise<void> {
+  async syncUserCount(sessionId: string = DEFAULT_BATTLE_SESSION_ID): Promise<void> {
     try {
-      console.log('Syncing user count with connected emails...');
+      console.log(`Syncing user count with connected emails for session: ${sessionId}`);
       const { data: session, error: fetchError } = await supabase
         .from('battle_sessions')
         .select('*')
-        .eq('id', DEFAULT_BATTLE_SESSION_ID)
+        .eq('id', sessionId)
         .single();
         
       if (fetchError) {
-        console.error('Error fetching session to sync:', fetchError.message);
+        console.error(`Error fetching session ${sessionId} to sync:`, fetchError.message);
         return;
       }
       
@@ -224,7 +224,7 @@ export const battleService = {
           const { error: updateError } = await supabase
             .from('battle_sessions')
             .update({ active_users: connectedEmails.length })
-            .eq('id', DEFAULT_BATTLE_SESSION_ID);
+            .eq('id', sessionId);
             
           if (updateError) {
             console.error('Error syncing user count:', updateError.message);
@@ -241,49 +241,38 @@ export const battleService = {
   },
 
   // Subscribe to battle session changes
-  subscribeToSession(callback: (session: BattleSession) => void): (() => void) {
-    console.log('Setting up realtime subscription to battle session...');
+  subscribeToSession(
+    callback: (session: BattleSession) => void, 
+    sessionId: string = DEFAULT_BATTLE_SESSION_ID
+  ): (() => void) {
+    console.log(`Setting up realtime subscription to battle session: ${sessionId}`);
     
     // Use a consistent channel name instead of random
-    const channelName = `battle_changes_${DEFAULT_BATTLE_SESSION_ID}`;
+    const channelName = `battle_changes_${sessionId}`;
     
     const channel = supabase
       .channel(channelName)
       .on(
         'postgres_changes',
-        { 
-          event: '*', // Listen to all events (insert, update, delete)
-          schema: 'public', 
+        {
+          event: 'UPDATE',
+          schema: 'public',
           table: 'battle_sessions',
-          filter: `id=eq.${DEFAULT_BATTLE_SESSION_ID}`
+          filter: `id=eq.${sessionId}`,
         },
-        async (payload) => {
-          console.log('Received battle session realtime update:', payload);
-          
-          // Get fresh data from the database to ensure we have the latest state
-          const { data: freshSession } = await supabase
-            .from('battle_sessions')
-            .select('*')
-            .eq('id', DEFAULT_BATTLE_SESSION_ID)
-            .single();
-          
-          if (freshSession) {
-            console.log('Fresh session data:', freshSession);
-            callback(freshSession as BattleSession);
-          } else if (payload.new) {
-            // Fallback to payload data if fresh fetch fails
+        (payload) => {
+          console.log('Battle session updated:', payload);
+          if (payload.new) {
             callback(payload.new as BattleSession);
           }
         }
       )
-      .subscribe((status) => {
-        console.log(`Battle session subscription status: ${status}`);
-      });
-    
-    // Return the cleanup function
+      .subscribe();
+
+    // Return unsubscribe function
     return () => {
-      console.log('Unsubscribing from battle session changes');
-      channel.unsubscribe();
+      console.log(`Unsubscribing from battle session changes: ${sessionId}`);
+      supabase.removeChannel(channel);
     };
   },
 

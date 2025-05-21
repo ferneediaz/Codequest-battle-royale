@@ -1,6 +1,6 @@
 /// <reference path="../types/codemirror.d.ts" />
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import Logo from "@/components/Logo";
@@ -10,6 +10,7 @@ import { BattleCategory, BattleState } from '../constants/battleConstants';
 import FloatingCodeBackground from '../components/FloatingCodeBackground';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { Badge } from "@/components/ui/badge";
 
 // Import styles
 import '../styles/confetti.css';
@@ -108,6 +109,19 @@ const BattleArena: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [isTabVisible, setIsTabVisible] = useState(true);
+  
+  // Get room ID from URL parameters or query string
+  const { roomId: urlRoomId } = useParams();
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const queryRoomId = queryParams.get('roomId');
+  
+  // Use room ID from either source
+  const roomId = urlRoomId || queryRoomId;
+  
+  // Add state for room info
+  const [roomInfo, setRoomInfo] = useState<any>(null);
+  const [isLoadingRoom, setIsLoadingRoom] = useState(true);
   
   // Use our refactored custom hooks
   const {
@@ -305,10 +319,49 @@ const BattleArena: React.FC = () => {
     }
   }, [currentQuestion, selectedLanguage]);
   
+  // Load room info
+  useEffect(() => {
+    const loadRoomInfo = async () => {
+      if (!roomId) {
+        setIsLoadingRoom(false);
+        return;
+      }
+      
+      try {
+        setIsLoadingRoom(true);
+        
+        const { data, error } = await supabase
+          .from('battle_rooms')
+          .select('*')
+          .eq('id', roomId)
+          .single();
+          
+        if (error) throw error;
+        
+        if (data) {
+          setRoomInfo(data);
+          // Use room-specific session ID
+          hasInitializedRef.current = false; // Reset initialization
+          console.log(`Joined custom room: ${data.name} (${roomId})`);
+        } else {
+          setDebugMsg("Room not found");
+          console.error("Room not found");
+        }
+      } catch (error) {
+        console.error('Error loading room info:', error);
+        setDebugMsg("Error loading room");
+      } finally {
+        setIsLoadingRoom(false);
+      }
+    };
+    
+    loadRoomInfo();
+  }, [roomId, setDebugMsg]);
+  
   // Check if database exists and set it up if needed
   useEffect(() => {
     // Only run initialization once, regardless of sessionId
-    if (user && !loading && !hasInitializedRef.current) {
+    if (user && !loading && !hasInitializedRef.current && !isLoadingRoom) {
       hasInitializedRef.current = true;
       
       // One-time reset of user ready state on page load
@@ -318,10 +371,11 @@ const BattleArena: React.FC = () => {
       setIsTopicSelectionComplete(false);
       setReadyUsers([]);
       
-      // Start normal initialization process
-      initializeSession();
+      // Start normal initialization process with room ID
+      const customSessionId = roomId ? `room_${roomId}` : undefined;
+      initializeSession(customSessionId);
     }
-  }, [user, loading, hasInitializedRef, initializeSession, setIsTopicSelectionComplete, setReadyUsers]);
+  }, [user, loading, hasInitializedRef, initializeSession, setIsTopicSelectionComplete, setReadyUsers, roomId, isLoadingRoom]);
 
   // Handle selecting a random challenge
   const handleRandomChallenge = useCallback(() => {
@@ -794,6 +848,7 @@ const BattleArena: React.FC = () => {
         {/* Session listener for real-time updates */}
         <BattleSessionListener 
           userEmail={user?.email}
+          sessionId={roomId ? `room_${roomId}` : sessionId}
           setConnectedUsers={setConnectedUsers}
           setPlayerCount={setPlayerCount}
           setReadyUsers={setReadyUsers}
@@ -815,6 +870,15 @@ const BattleArena: React.FC = () => {
           {/* <div className="w-42 h-42 mx-auto mb-6">
             <Logo className="h-32" />
           </div> */}
+          
+          {/* Room info display */}
+          {roomInfo && (
+            <div className="mb-4 text-center">
+              <Badge className="bg-indigo-700 mb-2">{roomInfo.game_mode === 'battle_royale' ? 'Battle Royale' : roomInfo.game_mode}</Badge>
+              <h2 className="text-2xl font-bold text-white">{roomInfo.name}</h2>
+              <p className="text-sm text-slate-400">Room ID: {roomId}</p>
+            </div>
+          )}
           
           {/* Battle header with title and timer */}
           <BattleHeader 

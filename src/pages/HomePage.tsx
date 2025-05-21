@@ -160,14 +160,26 @@ const HomePage = () => {
         <div className="text-center opacity-0 animate-fadeIn" style={{ animation: 'fadeIn 0.8s 0.4s forwards' }}>
           {/* Show battle button if logged in, otherwise show sign up button */}
           {user ? (
-            <Button 
-              size="lg" 
-              className="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white px-12 py-6 text-lg rounded-xl shadow-lg shadow-indigo-500/20 transition-all duration-300 hover:scale-105 hover:shadow-xl relative overflow-hidden group border border-indigo-500/20"
-              onClick={() => navigate('/battle')}
-            >
-              <span className="relative z-10">Join the Epic Quest</span>
-              <span className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-blue-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                size="lg" 
+                className="bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 text-white px-12 py-6 text-lg rounded-xl shadow-lg shadow-indigo-500/20 transition-all duration-300 hover:scale-105 hover:shadow-xl relative overflow-hidden group border border-indigo-500/20"
+                onClick={() => navigate('/create-game')}
+              >
+                <span className="relative z-10">Create a Game</span>
+                <span className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-blue-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+              </Button>
+
+              <Button 
+                size="lg" 
+                className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-12 py-6 text-lg rounded-xl shadow-lg shadow-blue-500/20 transition-all duration-300 hover:scale-105 hover:shadow-xl relative overflow-hidden group border border-blue-500/20"
+                onClick={() => navigate('/join')}
+              >
+                <span className="relative z-10">Join a Game</span>
+                <span className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
+              </Button>
+            </div>
+            
           ) : (
             <div className="flex flex-col items-center gap-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2">
