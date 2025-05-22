@@ -351,7 +351,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
         <div className="flex gap-2">
           <Button
             variant="outline"
-            className="border-green-700/50 text-white hover:bg-green-800/30"
+            className="border-green-500 bg-green-900/30 text-white hover:bg-green-800/70 hover:border-green-400 font-medium"
             disabled={editorFrozen || !isQuestionSelected || isRunningTests}
             onClick={runTestCases}
           >
@@ -369,7 +369,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
           </Button>
           
           <Button
-            className={`relative overflow-hidden ${isSubmitting ? 'bg-indigo-800' : 'bg-indigo-700 hover:bg-indigo-800'} text-white`}
+            className={`relative overflow-hidden ${isSubmitting ? 'bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white font-medium shadow-md`}
             disabled={editorFrozen || !isQuestionSelected || isSubmitting}
             onClick={onSubmitSolution}
           >

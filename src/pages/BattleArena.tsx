@@ -717,7 +717,7 @@ const BattleArena: React.FC = () => {
                         <div className="mt-6 text-center">
                           <Button 
                             variant="outline" 
-                            className="border-gray-600 text-gray-300 hover:bg-gray-700/50"
+                            className="border-indigo-500 bg-indigo-900/30 text-white hover:bg-indigo-800/70 hover:border-indigo-400 font-medium"
                             onClick={backToQuestionList}
                           >
                             ← Back to Problem List
@@ -789,7 +789,7 @@ const BattleArena: React.FC = () => {
                             <div className="mt-4 text-center">
                               <Button 
                                 variant="outline" 
-                                className="border-gray-600 text-gray-300 hover:bg-gray-700/50"
+                                className="border-indigo-500 bg-indigo-900/30 text-white hover:bg-indigo-800/70 hover:border-indigo-400 font-medium"
                                 onClick={() => setActiveView('instructions')}
                               >
                                 Back to Instructions

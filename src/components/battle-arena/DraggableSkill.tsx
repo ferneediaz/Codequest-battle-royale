@@ -34,19 +34,20 @@ const DraggableSkill: React.FC<DraggableSkillProps> = ({ skill, isAvailable }) =
         ${isAvailable 
           ? `${
               skill.name === 'Freeze' 
-                ? 'bg-gradient-to-br from-blue-400 to-blue-600 text-white hover:from-blue-300 hover:to-blue-500 hover:shadow-[0_0_15px_rgba(59,130,246,0.5)]' 
-                : 'bg-gradient-to-br from-indigo-700 to-purple-800 text-white hover:from-indigo-600 hover:to-purple-700 hover:shadow-[0_0_15px_rgba(99,102,241,0.5)]'
+                ? 'bg-gradient-to-br from-blue-500 to-blue-800 text-white hover:from-blue-400 hover:to-blue-700 hover:shadow-[0_0_15px_rgba(59,130,246,0.6)]' 
+                : 'bg-gradient-to-br from-fuchsia-500 to-purple-800 text-white hover:from-fuchsia-400 hover:to-purple-700 hover:shadow-[0_0_15px_rgba(217,70,239,0.6)]'
             } hover:scale-110 hover:-translate-y-1` 
           : 'bg-gray-700 text-gray-400 cursor-not-allowed opacity-50'
         } 
         ${isDragging 
           ? 'scale-90 opacity-50 ring-2 ring-offset-2 ' + 
-            (skill.name === 'Freeze' ? 'ring-blue-400 ring-offset-blue-100' : 'ring-indigo-400 ring-offset-indigo-100')
+            (skill.name === 'Freeze' ? 'ring-blue-300 ring-offset-blue-100' : 'ring-fuchsia-300 ring-offset-fuchsia-100')
           : 'opacity-100'
         }
         ${!isAvailable ? '' : 'hover:ring-2 hover:ring-offset-1 ' + 
-          (skill.name === 'Freeze' ? 'hover:ring-blue-300' : 'hover:ring-indigo-300')
+          (skill.name === 'Freeze' ? 'hover:ring-blue-300' : 'hover:ring-fuchsia-300')
         }
+        border ${isAvailable ? (skill.name === 'Freeze' ? 'border-blue-300' : 'border-fuchsia-300') : 'border-gray-600'}
       `}
     >
       {/* Skill content */}
@@ -56,7 +57,7 @@ const DraggableSkill: React.FC<DraggableSkillProps> = ({ skill, isAvailable }) =
       `}>
         {skill.icon}
       </div>
-      <div className="text-[10px] font-medium">{skill.name}</div>
+      <div className="text-[11px] font-bold text-shadow-sm">{skill.name}</div>
 
       {/* Skill effect indicator */}
       <div className={`
@@ -64,8 +65,8 @@ const DraggableSkill: React.FC<DraggableSkillProps> = ({ skill, isAvailable }) =
         transition-all duration-300
         ${isAvailable 
           ? skill.name === 'Freeze'
-            ? 'bg-blue-400 animate-pulse'
-            : 'bg-indigo-400 animate-pulse'
+            ? 'bg-blue-300 animate-pulse'
+            : 'bg-fuchsia-300 animate-pulse'
           : 'bg-gray-500'
         }
       `} />
@@ -75,10 +76,13 @@ const DraggableSkill: React.FC<DraggableSkillProps> = ({ skill, isAvailable }) =
         absolute inset-0 rounded-lg
         transition-all duration-300 opacity-0 group-hover:opacity-100
         ${skill.name === 'Freeze'
-          ? 'bg-blue-400/10 animate-pulse'
-          : 'bg-indigo-400/10 animate-pulse'
+          ? 'bg-blue-300/20 animate-pulse'
+          : 'bg-fuchsia-300/20 animate-pulse'
         }
       `} />
+
+      {/* Add a subtle shadow for text readability */}
+      <div className="absolute inset-0 bg-black/10 rounded-lg"></div>
     </div>
   );
 };

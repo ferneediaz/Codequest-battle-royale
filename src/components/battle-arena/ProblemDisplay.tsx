@@ -334,7 +334,7 @@ const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
           <Button 
             variant="ghost" 
             size="sm" 
-            className="mr-2 text-gray-400 hover:text-white"
+            className="mr-2 bg-indigo-900/40 text-white hover:text-white hover:bg-indigo-800/60 border border-indigo-500/40"
             onClick={onBackToList}
           >
             ← Back
@@ -427,7 +427,7 @@ const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
               <Button
                 onClick={onBackToList}
                 variant="outline"
-                className="text-white"
+                className="border-indigo-500 bg-indigo-900/30 text-white hover:bg-indigo-800/70 hover:border-indigo-400 font-medium"
               >
                 ← Back to Problem List
               </Button>
@@ -505,7 +505,7 @@ const ProblemDisplay: React.FC<ProblemDisplayProps> = ({
               <Button
                 onClick={onBackToList}
                 variant="outline"
-                className="text-white"
+                className="border-indigo-500 bg-indigo-900/30 text-white hover:bg-indigo-800/70 hover:border-indigo-400 font-medium"
               >
                 ← Back to Problem List
               </Button>
