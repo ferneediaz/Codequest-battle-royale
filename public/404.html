@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>CodeQuest Battle Royale - Redirecting</title>
+    <script>
+      // Simple hash router redirect
+      (function() {
+        // Get the path from the URL
+        var path = window.location.pathname;
+        var pathParts = path.split('/');
+        
+        // Find repository name in path
+        var repoName = '';
+        for (var i = 1; i < pathParts.length; i++) {
+          if (pathParts[i] && pathParts[i].toLowerCase().includes('codequest')) {
+            repoName = pathParts[i];
+            break;
+          }
+        }
+        
+        // Find "battle" segment and room ID
+        var roomId = null;
+        var battleIndex = -1;
+        for (var i = 0; i < pathParts.length - 1; i++) {
+          if (pathParts[i].toLowerCase() === 'battle') {
+            battleIndex = i;
+            roomId = pathParts[i+1];
+            break;
+          }
+        }
+        
+        // Create base URL with repo name
+        var baseUrl = window.location.origin;
+        if (repoName) {
+          baseUrl += '/' + repoName;
+        }
+        
+        // If we found a battle room ID, redirect to hash URL format
+        if (roomId) {
+          window.location.replace(baseUrl + '/#/battle/' + roomId);
+        } else {
+          // Otherwise, just go to the home page
+          window.location.replace(baseUrl + '/');
+        }
+      })();
+    </script>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        background: linear-gradient(to bottom, #111827, #1f2937);
+        color: white;
+        text-align: center;
+        padding: 40px 20px;
+        height: 100vh;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+      h1 {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+      }
+      p {
+        font-size: 1.2rem;
+        margin-bottom: 1.5rem;
+        max-width: 600px;
+        opacity: 0.9;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>CodeQuest Battle Royale</h1>
+    <p>Redirecting you to the right destination...</p>
+    <noscript>
+      <p>JavaScript is required for this application to work.</p>
+      <p>Please enable JavaScript or <a href="/Codequest-battle-royale/" class="btn">Return to Homepage</a></p>
+    </noscript>
+  </body>
+</html>

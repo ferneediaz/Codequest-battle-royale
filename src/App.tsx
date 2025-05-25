@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import HomePage from './pages/HomePage';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import BattleArena from './pages/BattleArena';
 import GameSetupPage from './pages/GameSetupPage';
 import JoinRoom from './pages/JoinRoom';
@@ -18,7 +18,7 @@ const App = () => {
 
   return (
     <AuthProvider>
-      <Router basename="/codequest-battle-royale">
+      <Router>
         <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
           <main>
             <Routes>

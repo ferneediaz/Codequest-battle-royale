@@ -350,8 +350,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
       <div className="bg-gray-800 p-3 flex flex-col gap-3 rounded-b-lg">
         <div className="flex gap-2">
           <Button
-            variant="outline"
-            className="border-green-500 bg-green-900/30 text-white hover:bg-green-800/70 hover:border-green-400 font-medium"
+            variant="success"
             disabled={editorFrozen || !isQuestionSelected || isRunningTests}
             onClick={runTestCases}
           >

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CodeQuest Battle Royale</title>
+  <script>
+    // Ultra-simplified redirect for GitHub Pages
+    (function() {
+      // Extract path parts
+      var path = window.location.pathname;
+      var pathParts = path.split('/');
+      
+      // Find the repository name (should be consistent case)
+      var repoName = 'Codequest-battle-royale';
+      
+      // Check if this is a battle room URL
+      var isBattleRoom = false;
+      var roomId = null;
+      
+      for (var i = 0; i < pathParts.length - 1; i++) {
+        if (pathParts[i].toLowerCase() === 'battle') {
+          isBattleRoom = true;
+          roomId = pathParts[i+1];
+          break;
+        }
+      }
+      
+      // Create the proper hash URL
+      var baseUrl = window.location.origin + '/' + repoName;
+      
+      if (isBattleRoom && roomId) {
+        // For battle room URLs
+        window.location.href = baseUrl + '/#/battle/' + roomId;
+      } else {
+        // For any other path, go to home
+        window.location.href = baseUrl + '/';
+      }
+    })();
+  </script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background: linear-gradient(to bottom, #111827, #1f2937);
+      color: white;
+      text-align: center;
+      padding: 40px 20px;
+      height: 100vh;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+    p { font-size: 1.2rem; margin-bottom: 1.5rem; max-width: 600px; opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <h1>CodeQuest Battle Royale</h1>
+  <p>Redirecting to the application...</p>
+  <noscript>
+    <p>JavaScript is required for this application to work.</p>
+    <p>Please enable JavaScript and <a href="/Codequest-battle-royale/">return to the homepage</a>.</p>
+  </noscript>
+</body>
+</html> 

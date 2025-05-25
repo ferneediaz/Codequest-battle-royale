@@ -89,26 +89,16 @@ const GameSetupPage = () => {
       console.log("Room created successfully:", data);
       roomCreated = true;
       
-      // Generate invite link
+      // Generate invite link for HashRouter
       const baseUrl = window.location.origin;
-      const basePath = import.meta.env.BASE_URL || '/';
-      const joinPath = basePath.endsWith('/') 
-        ? `${basePath.slice(0, -1)}/join/${roomId}` 
-        : `${basePath}/join/${roomId}`;
+      // For HashRouter format
+      const joinPath = `/#/join/${roomId}`;
       const link = `${baseUrl}${joinPath}`;
       setInviteLink(link);
       
-      // Navigate to the room - use a direct approach
-      const battlePath = basePath.endsWith('/')
-        ? `${basePath.slice(0, -1)}/battle/${roomId}`
-        : `${basePath}/battle/${roomId}`;
-      console.log(`Navigating to ${battlePath}`);
-      
-      // Use direct browser navigation with proper base path
-      const fullPath = `${baseUrl}${battlePath}`;
-                      
-      console.log(`Full navigation path: ${fullPath}`);
-      window.location.href = fullPath;
+      // Use React Router's navigate for client-side navigation
+      console.log(`Navigating to /battle/${roomId}`);
+      navigate(`/battle/${roomId}`);
       
     } catch (error: any) {
       console.error('Error creating room:', error);
@@ -123,13 +113,6 @@ const GameSetupPage = () => {
       
       // If room creation somehow succeeded despite errors
       if (roomCreated) {
-        const battlePath = `/battle/${roomId}`;
-        const fullPath = window.location.origin + 
-                        (window.location.pathname.includes('/codequest-battle-royale') 
-                          ? '/codequest-battle-royale' 
-                          : '') + 
-                        battlePath;
-        
         setDebugMsg("Room created but navigation failed. Click below to join your room manually.");
       }
     } finally {
@@ -137,15 +120,12 @@ const GameSetupPage = () => {
     }
   };
   
-  // Copy invite link to clipboard
+  // Copy invite link to clipboard - update for HashRouter
   const copyInviteLink = () => {
-    // Build a proper sharable link using current domain and base path
+    // Build a proper sharable link using hash-based routing
     const baseUrl = window.location.origin;
-    const basePath = import.meta.env.BASE_URL || '/';
-    const joinPath = basePath.endsWith('/') 
-      ? `${basePath.slice(0, -1)}/join/${roomId}` 
-      : `${basePath}/join/${roomId}`;
-    const link = `${baseUrl}${joinPath}`;
+    const hashPath = `/#/join/${roomId}`;
+    const link = `${baseUrl}${hashPath}`;
     
     navigator.clipboard.writeText(link);
     setLinkCopied(true);
@@ -318,7 +298,7 @@ const GameSetupPage = () => {
             <div className="flex gap-2">
               <Input
                 className="bg-slate-800 border-slate-700 text-white"
-                value={`${window.location.origin}${import.meta.env.BASE_URL || '/'}${(import.meta.env.BASE_URL || '/').endsWith('/') ? '' : '/'}join/${roomId}`}
+                value={`${window.location.origin}/#/join/${roomId}`}
                 readOnly
               />
               <Button 
@@ -368,13 +348,18 @@ const GameSetupPage = () => {
           </div>
           
           {/* Return Home Link */}
-          <div className="mt-6 text-center">
-            <button 
-              className="text-slate-400 hover:text-white text-sm"
+          <div className="mt-8 text-center">
+            <Button 
+              variant="secondary"
+              size="default"
+              className="bg-slate-800 hover:bg-slate-700 text-white border border-indigo-500/30 hover:border-indigo-500 font-medium px-5 py-2 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 hover:scale-105"
               onClick={() => navigate('/')}
             >
+              <svg className="w-4 h-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
               Return to Homepage
-            </button>
+            </Button>
           </div>
         </Card>
       </div>

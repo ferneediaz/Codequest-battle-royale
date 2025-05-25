@@ -899,8 +899,9 @@ const BattleArena: React.FC = () => {
           {battleState !== 'battle_room' && (
             <div className="flex gap-4 justify-center flex-wrap">
               <Button
-                variant="outline"
-                className="border-indigo-700/50 text-white hover:bg-indigo-800/30"
+                variant="battle"
+                size="lg"
+                className="hover:scale-105 transition-transform duration-300"
                 onClick={async () => {
                   await leaveSession();
                   navigate('/');

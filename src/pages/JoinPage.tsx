@@ -154,12 +154,14 @@ const JoinPage = () => {
           
           {/* Return Home Link */}
           <div className="mt-6 text-center">
-            <button 
-              className="text-slate-400 hover:text-white text-sm"
+            <Button 
+              variant="battle"
+              size="lg"
+              className="hover:scale-105 transition-transform duration-300"
               onClick={() => navigate('/')}
             >
               Return to Homepage
-            </button>
+            </Button>
           </div>
         </Card>
       </div>

@@ -1,19 +1,38 @@
 import { useState, useEffect } from 'react';
 import { BattleCategory, BattleState } from '../../constants/battleConstants';
 import { supabase } from '../../lib/supabase';
+import { useLocation } from 'react-router-dom';
 
 /**
  * Custom hook for managing battle topic selection and user readiness
  */
 export const useTopicSelection = (user: any) => {
+  // Add useLocation hook to get the current location
+  const location = useLocation();
+  
   // Topic selection state
   const [selectedTopics, setSelectedTopics] = useState<BattleCategory[]>([]);
-  const [showTopicSelection, setShowTopicSelection] = useState(true);
-  const [isTopicSelectionComplete, setIsTopicSelectionComplete] = useState(false);
+  const [showTopicSelection, setShowTopicSelection] = useState<boolean>(true);
+  const [isTopicSelectionComplete, setIsTopicSelectionComplete] = useState<boolean>(false);
+  
+  // Session state
+  const [readyUsers, setReadyUsers] = useState<string[]>([]);
   const [topicSelections, setTopicSelections] = useState<Record<string, BattleCategory[]>>({});
   
-  // Add user readiness tracking
-  const [readyUsers, setReadyUsers] = useState<string[]>([]);
+  // Utility function to get room ID from location
+  const getRoomIdFromLocation = () => {
+    // Get the pathname from location (for HashRouter, this is the path after the #)
+    const pathname = location.pathname;
+    const pathParts = pathname.split('/');
+    
+    // Look for "battle" in the path and get the next segment
+    const roomIndex = pathParts.findIndex(part => part === 'battle');
+    const roomId = roomIndex >= 0 && roomIndex + 1 < pathParts.length ? 
+        pathParts[roomIndex + 1] : null;
+    
+    console.log("Got room ID from location:", roomId);
+    return roomId;
+  };
   
   // Handle topic selection
   const handleTopicSelect = (topic: BattleCategory) => {
@@ -45,13 +64,9 @@ export const useTopicSelection = (user: any) => {
         // Use an async function to handle the database update
         const updateReadyUsers = async () => {
           try {
-            // Get the current sessionId from URL
-            const pathParts = window.location.pathname.split('/');
-            // Look for "battle" in the path and get the next segment
-            const roomIndex = pathParts.findIndex(part => part === 'battle');
-            const roomId = roomIndex >= 0 && roomIndex + 1 < pathParts.length ? 
-                pathParts[roomIndex + 1] : null;
-                
+            // Get room ID from location
+            const roomId = getRoomIdFromLocation();
+            
             // Construct the session ID - might be a room ID or default session
             const sessionId = roomId ? `room_${roomId}` : 'default-battle-session';
             
@@ -99,13 +114,9 @@ export const useTopicSelection = (user: any) => {
     setDebugMsg(`Ready for battle with topics: ${selectedTopics.join(' & ')}`);
     
     try {
-      // Get the current sessionId from URL
-      const pathParts = window.location.pathname.split('/');
-      // Look for "battle" in the path and get the next segment
-      const roomIndex = pathParts.findIndex(part => part === 'battle');
-      const roomId = roomIndex >= 0 && roomIndex + 1 < pathParts.length ? 
-          pathParts[roomIndex + 1] : null;
-          
+      // Get room ID from location
+      const roomId = getRoomIdFromLocation();
+      
       // Construct the session ID - might be a room ID or default session
       const sessionId = roomId ? `room_${roomId}` : 'default-battle-session';
       
@@ -190,13 +201,9 @@ export const useTopicSelection = (user: any) => {
     // Also remove user from ready list in database
     if (user?.email) {
       try {
-        // Get the current sessionId from URL
-        const pathParts = window.location.pathname.split('/');
-        // Look for "battle" in the path and get the next segment
-        const roomIndex = pathParts.findIndex(part => part === 'battle');
-        const roomId = roomIndex >= 0 && roomIndex + 1 < pathParts.length ? 
-            pathParts[roomIndex + 1] : null;
-            
+        // Get room ID from location
+        const roomId = getRoomIdFromLocation();
+        
         // Construct the session ID - might be a room ID or default session
         const sessionId = roomId ? `room_${roomId}` : 'default-battle-session';
         
@@ -243,13 +250,9 @@ export const useTopicSelection = (user: any) => {
     try {
       setDebugMsg('Transitioning to battle room...');
       
-      // Get the current sessionId from URL
-      const pathParts = window.location.pathname.split('/');
-      // Look for "battle" in the path and get the next segment
-      const roomIndex = pathParts.findIndex(part => part === 'battle');
-      const roomId = roomIndex >= 0 && roomIndex + 1 < pathParts.length ? 
-          pathParts[roomIndex + 1] : null;
-          
+      // Get room ID from location
+      const roomId = getRoomIdFromLocation();
+      
       // Construct the session ID - might be a room ID or default session
       const sessionId = roomId ? `room_${roomId}` : 'default-battle-session';
       

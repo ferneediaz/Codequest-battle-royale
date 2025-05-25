@@ -2,9 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/svg+xml" href="./vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CodeQuest Battle Royale</title>
+    <!-- Use a more reliable base tag for GitHub Pages -->
+    <base href="/" />
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       body {
@@ -28,8 +30,42 @@
         padding: 0 20px;
       }
     </style>
-    <script type="module" crossorigin src="/codequest-battle-royale/assets/index-B1MaD8bQ.js"></script>
-    <link rel="stylesheet" crossorigin href="/codequest-battle-royale/assets/index-lBsMgpmm.css">
+    <!-- Simplified GitHub Pages base URL script -->
+    <script>
+      (function() {
+        // Only run on GitHub Pages
+        if (window.location.hostname.includes('github.io')) {
+          // Hardcode the exact repository name to avoid case sensitivity issues
+          var repoName = 'Codequest-battle-royale';
+          
+          // Set the base URL to the repository
+          var baseElement = document.querySelector('base');
+          if (baseElement) {
+            baseElement.href = '/' + repoName + '/';
+            console.log('Set base URL to: /' + repoName + '/');
+          }
+          
+          // Check if we need to redirect to a hash route
+          var path = window.location.pathname;
+          if (path.includes('/battle/')) {
+            var pathParts = path.split('/');
+            var battleIndex = pathParts.indexOf('battle');
+            
+            if (battleIndex >= 0 && battleIndex + 1 < pathParts.length) {
+              var roomId = pathParts[battleIndex + 1];
+              
+              // If this is a direct URL to a battle room, redirect to hash URL
+              if (roomId) {
+                var newUrl = window.location.origin + '/' + repoName + '/#/battle/' + roomId;
+                window.location.replace(newUrl);
+              }
+            }
+          }
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/Codequest-battle-royale/assets/index-C03YUUvp.js"></script>
+    <link rel="stylesheet" crossorigin href="/Codequest-battle-royale/assets/index-koKidtBJ.css">
   </head>
   <body>
     <div id="root">

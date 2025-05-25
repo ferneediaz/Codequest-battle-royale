@@ -1,5 +1,6 @@
 node_modules
 .env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
@@ -15,23 +16,41 @@ node_modules
 *.hg
 *.idea
 *.DS_Store
-*.env
 *.vscode
-*.cache
+
+# Build and distribution files
+dist
+dist/
+*_dist
+*.dist
+/build/
+/dist/
+/dist*
+/public/dist/
+
+# Logs
+logs
 *.log
-*.tmp
-*.pid
-*.seed
-*.sass-cache
-*.svn
-*.git
-*.hg
-*.idea
-*.DS_Store
-*.env
-*.vscode
-*.cache
-*.log
-*.tmp
-*.pid
-*.seed
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Development documentation files
+/docs/
+/docs/BATTLE_SESSIONS.md
+/docs/KNOWN_BUGS.md
+/docs/SUPABASE_REALTIME.md
+.cursorrules
