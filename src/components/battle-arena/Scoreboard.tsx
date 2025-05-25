@@ -1,18 +1,22 @@
 import React from 'react';
 import { getAvatarUrl } from '../../utils/battleUtils';
+import { Bug } from 'lucide-react';
+import { debugState } from '../../config/debugManager';
 
 interface ScoreboardProps {
   connectedUsers: string[];
   playerScores: Record<string, number>;
   currentUserEmail: string | undefined;
-  debugMsg: string | null;
+  debugMsg: string;
+  children?: React.ReactNode;
 }
 
 const Scoreboard: React.FC<ScoreboardProps> = ({
   connectedUsers,
   playerScores,
   currentUserEmail,
-  debugMsg
+  debugMsg,
+  children
 }) => {
   return (
     <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -49,6 +53,20 @@ const Scoreboard: React.FC<ScoreboardProps> = ({
         <p className="text-xs text-gray-400">
           {debugMsg || "Battle in progress..."}
         </p>
+        
+        {/* Development mode indicator */}
+        {children}
+        
+        {/* Debug panel - only visible in debug mode */}
+        {debugState.isEnabled() && debugMsg && (
+          <div className="mt-2 text-xs bg-indigo-900/20 border border-indigo-700 p-2 rounded-md">
+            <div className="flex items-center text-indigo-400 mb-1">
+              <Bug className="h-3 w-3 mr-1" />
+              <span className="font-medium">Debug Data:</span>
+            </div>
+            <div className="text-indigo-200">{debugMsg}</div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import JoinRoom from './pages/JoinRoom';
 import JoinPage from './pages/JoinPage';
 import { AuthProvider } from './contexts/AuthContext';
 import { initializeAppServices } from './lib/initServices';
+import { debugState } from './config/debugManager';
 
 const App = () => {
   useEffect(() => {
@@ -14,6 +15,16 @@ const App = () => {
     initializeAppServices().catch(err => {
       console.error('Failed to initialize services:', err);
     });
+  }, []);
+
+  useEffect(() => {
+    // Initialize debug mode
+    try {
+      debugState.initialize();
+      console.log(`Debug mode is ${debugState.isEnabled() ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      console.error('Failed to initialize debug mode:', error);
+    }
   }, []);
 
   return (

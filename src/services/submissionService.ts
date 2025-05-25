@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { getTestRunner } from './testRunners';
+import { debugState } from '../config/debugManager';
 
 /**
  * STANDARDIZED FORMAT FOR JUDGE0 TEST CASES
@@ -109,6 +110,15 @@ export interface JudgeResult {
   time?: string;
   memory?: number;
   token?: string;
+  _debug?: {
+    originalCode?: string;
+    modifiedCode?: string;
+    stdin?: string;
+    error?: string;
+    parsedResults?: any;
+    debugLines?: string[];
+    stderr?: string;
+  };
 }
 
 export interface SubmissionDetails {
@@ -161,18 +171,26 @@ class SubmissionService {
       // Prepare code for submission by adding standard test runner
       const modifiedCode = getTestRunner(submission.source_code, submission.language_id);
       
-      console.log('JUDGE0 DEBUG - Original code:', submission.source_code);
-      console.log('JUDGE0 DEBUG - Modified code with test runner:', modifiedCode.substring(0, 500) + '... (truncated)');
-      console.log('JUDGE0 DEBUG - Submitting to Judge0 with language_id:', submission.language_id);
-      console.log('JUDGE0 DEBUG - Stdin input:', submission.stdin);
+      // Enhanced debug logging for development
+      if (debugState.isEnabled()) {
+        console.log('JUDGE0 DEBUG - Original code:', submission.source_code);
+        console.log('JUDGE0 DEBUG - Modified code with test runner:', modifiedCode.substring(0, 500) + '... (truncated)');
+        console.log('JUDGE0 DEBUG - Submitting to Judge0 with language_id:', submission.language_id);
+        console.log('JUDGE0 DEBUG - Stdin input:', submission.stdin);
+      }
       
       // Headers for the API request
       const headers: Record<string, string> = {
         'Content-Type': 'application/json'
       };
       
-      console.log('JUDGE0 DEBUG - Request headers:', JSON.stringify(headers));
-      console.log('JUDGE0 DEBUG - Sending request to server proxy:', `${SERVER_URL}/api/judge/submissions`);
+      if (debugState.isEnabled()) {
+        console.log('JUDGE0 DEBUG - Request headers:', JSON.stringify(headers));
+        console.log('JUDGE0 DEBUG - Sending request to server proxy:', `${SERVER_URL}/api/judge/submissions`);
+        
+        // Add custom header to indicate debug mode is enabled
+        headers['X-Debug-Mode'] = 'true';
+      }
       
       let response;
       try {
@@ -182,7 +200,9 @@ class SubmissionService {
           headers,
           body: JSON.stringify({
             ...submission,
-            source_code: modifiedCode
+            source_code: modifiedCode,
+            // Always include debug flag when debug mode is enabled
+            debug_mode: debugState.isEnabled()
           })
         });
       } catch (fetchError) {
@@ -190,7 +210,9 @@ class SubmissionService {
         throw new Error(`Failed to connect to server proxy at ${SERVER_URL}: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`);
       }
       
-      console.log('JUDGE0 DEBUG - Submission response status:', response.status);
+      if (debugState.isEnabled()) {
+        console.log('JUDGE0 DEBUG - Submission response status:', response.status);
+      }
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -199,24 +221,50 @@ class SubmissionService {
       }
       
       const submissionData = await response.json();
-      console.log('JUDGE0 DEBUG - Submission data:', JSON.stringify(submissionData));
+      
+      if (debugState.isEnabled()) {
+        console.log('JUDGE0 DEBUG - Submission data:', JSON.stringify(submissionData));
+      }
       
       if (!submissionData.token) {
         throw new Error('No submission token received');
       }
       
       // Poll for results
-      return await this.getSubmissionResult(submissionData.token);
+      const result = await this.getSubmissionResult(submissionData.token);
+      
+      // Store the original code and modified code in the result for debugging
+      if (debugState.isEnabled()) {
+        result._debug = {
+          originalCode: submission.source_code,
+          modifiedCode: modifiedCode,
+          stdin: submission.stdin
+        };
+      }
+      
+      return result;
       
     } catch (error) {
       console.error('JUDGE0 DEBUG - Error submitting code:', error);
-      return {
+      const result = {
         status: {
           id: JUDGE_STATUS.INTERNAL_ERROR,
           description: 'Internal Error'
         },
         message: `Error submitting code: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
+      
+      // Add debug info even to error results
+      if (debugState.isEnabled()) {
+        (result as any)._debug = {
+          originalCode: submission.source_code,
+          modifiedCode: getTestRunner(submission.source_code, submission.language_id),
+          stdin: submission.stdin,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        };
+      }
+      
+      return result;
     }
   }
   
@@ -235,6 +283,11 @@ class SubmissionService {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json'
       };
+      
+      // Always add debug header when debug mode is enabled
+      if (debugState.isEnabled()) {
+        headers['X-Debug-Mode'] = 'true';
+      }
       
       // Poll for results with exponential backoff
       while (!result && attempts < maxAttempts) {
@@ -301,6 +354,15 @@ class SubmissionService {
 
                   // Update the stdout to just include the JSON part so other functions can parse it correctly
                   data.stdout = jsonPart;
+                  
+                  // Add debug information directly to the result object
+                  result._debug = {
+                    ...(result._debug || {}),
+                    originalCode: data.source_code,
+                    stdin: data.stdin,
+                    parsedResults: parsedOutput,
+                    debugLines: parsedOutput.debug || []
+                  };
                 } catch (innerError) {
                   console.error('JUDGE0 DEBUG - Failed to parse JSON part:', innerError);
                 }
@@ -317,6 +379,10 @@ class SubmissionService {
           
           if (data.stderr) {
             console.log('JUDGE0 DEBUG - Stderr:', data.stderr);
+            
+            // Store stderr in debug data
+            if (!result._debug) result._debug = {};
+            result._debug.stderr = data.stderr;
           }
           
           if (data.compile_output) {

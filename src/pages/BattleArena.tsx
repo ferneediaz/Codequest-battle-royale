@@ -29,6 +29,7 @@ import BattleHeader from '../components/battle-arena/BattleHeader';
 import TestResultItem from '../components/battle-arena/TestResultItem';
 import Confetti from '../components/battle-arena/Confetti';
 import BattleTopics from '../components/battle-arena/BattleTopics';
+import DebugModeIndicator from '../components/DebugModeIndicator';
 
 // Import custom hooks
 import { useSkillEffects } from '../hooks/battle/useSkillEffects';
@@ -42,6 +43,9 @@ import { useCharacterCountTracker } from '../hooks/battle/useCharacterCountTrack
 // Import shared types
 import { CodeProblem } from '../services/problemService';
 import { TestResults } from '../components/battle-arena/CodeEditor';
+
+// Import debugState
+import { debugState } from '../config/debugManager';
 
 // Define allowed language types
 type ProgrammingLanguage = 'javascript' | 'python';
@@ -768,6 +772,7 @@ const BattleArena: React.FC = () => {
                                       actual={test.actual}
                                       passed={true}
                                       logs={test.logs || []}
+                                      debugInfo={debugState.isEnabled() ? (test.debugInfo || testResults.debugData) : undefined}
                                     />
                                   ))}
                                   
@@ -780,6 +785,7 @@ const BattleArena: React.FC = () => {
                                       actual={test.actual}
                                       passed={false}
                                       logs={test.logs || []}
+                                      debugInfo={debugState.isEnabled() ? (test.debugInfo || testResults.debugData) : undefined}
                                     />
                                   ))}
                                 </div>
@@ -827,13 +833,16 @@ const BattleArena: React.FC = () => {
             </div>
           )}
           
-          {/* Scoreboard and notifications */}
+          {/* Add Scoreboard here, after the grid */}
           <Scoreboard 
             connectedUsers={connectedUsers}
             playerScores={playerScores}
             currentUserEmail={user?.email}
             debugMsg={debugMsg}
           />
+
+          {/* Add Debug indicator outside the Scoreboard */}
+          <DebugModeIndicator position="bottom-right" />
         </div>
       );
     }

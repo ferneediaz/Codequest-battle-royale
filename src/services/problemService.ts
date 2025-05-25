@@ -25,6 +25,7 @@ export interface CodeProblem {
   testCases: TestCase[];
   timeLimit?: number;
   memoryLimit?: number;
+  functionName?: string;
 }
 
 // Map category names to their file slug versions

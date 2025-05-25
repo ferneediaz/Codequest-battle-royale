@@ -1,8 +1,38 @@
-import { useState } from 'react';
-import { submissionService, LANGUAGE_IDS, JudgeResult, JUDGE_STATUS } from '../../services/submissionService';
+import { useState, useCallback } from 'react';
+import { submissionService, LANGUAGE_IDS, JUDGE_STATUS } from '../../services/submissionService';
 import { supabase } from '../../lib/supabase';
 import { TestResults } from '../../components/battle-arena/CodeEditor';
 import { CodeProblem } from '../../services/problemService';
+import { getTestRunner } from '../../services/testRunners';
+import { debugState } from '../../config/debugManager';
+
+/**
+ * Extract the function name from the user code
+ * This is used as a fallback when functionName is not defined in the problem
+ */
+const extractFunctionName = (code: string, language: string): string => {
+  try {
+    if (language === 'javascript') {
+      // Try to match: function name(...) or const name = (...) =>
+      const fnMatch = code.match(/function\s+(\w+)\s*\(|const\s+(\w+)\s*=\s*\([^)]*\)\s*=>/);
+      if (fnMatch) {
+        return fnMatch[1] || fnMatch[2];
+      }
+    } else if (language === 'python') {
+      // Try to match: def name(...):
+      const fnMatch = code.match(/def\s+(\w+)\s*\(/);
+      if (fnMatch) {
+        return fnMatch[1];
+      }
+    }
+    
+    // Default fallback
+    return 'solution';
+  } catch (error) {
+    console.error('Error extracting function name:', error);
+    return 'solution';
+  }
+};
 
 /**
  * Custom hook to handle code submission and test running functionality
@@ -21,277 +51,316 @@ export const useSubmissionHandler = (user: any, currentQuestion: CodeProblem | n
   // Add state for celebration animation
   const [showConfetti, setShowConfetti] = useState(false);
   
-  // Handle running tests
-  const handleTestRun = (results: TestResults | null, isRunning: boolean, debugCallback?: (msg: string) => void) => {
-    // Ensure results have properly formatted test cases
-    if (results && results.failedTests) {
-      // Make sure each test case has input, expected, and actual values
-      results.failedTests = results.failedTests.map((test: any, i: number) => ({
-        ...test,
-        input: test.input || `Test case ${i+1}`,
-        expected: test.expected || "true",
-        actual: test.actual || "false"
-      }));
-      
-      // Also ensure each passed test case has input and expected values
-      if (results.passedTests) {
-        results.passedTests = results.passedTests.map((test: any, i: number) => ({
-          ...test,
-          input: test.input || `Test case ${i+1}`,
-          expected: test.expected || "true",
-          actual: test.actual || test.expected || "true"
-        }));
-      }
-
-      // Debug userLogs
-      console.log("DEBUG: Test Results with userLogs:", { 
-        hasUserLogs: !!results.userLogs, 
-        logsLength: results.userLogs?.length || 0,
-        logsSample: results.userLogs?.slice(0, 2)
-      });
-    }
-    
-    setTestResults(results);
-    setIsRunningTests(isRunning);
-    
-    // Automatically switch to output tab when test results are available
-    if (results && !isRunning) {
-      setActiveView('output');
-      
-      // Add debug info if tests are failing
-      if (debugCallback && results.failedTests && results.failedTests.length > 0) {
-        console.log("Debug info for failed tests:");
-        results.failedTests.forEach((test: any) => {
-          console.log(`Test input: "${test.input}"`);
-          console.log(`Expected: ${test.expected}`);
-          console.log(`Actual: ${test.actual}`);
-          
-          // For palindrome problem - debug the algorithm
-          if (currentQuestion?.id === 'valid-palindrome') {
-            const cleanInput = String(test.input).replace(/^"|"$/g, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
-            const reversed = cleanInput.split('').reverse().join('');
-            console.log(`Cleaned input: "${cleanInput}"`);
-            console.log(`Reversed: "${reversed}"`);
-            console.log(`Are they equal? ${cleanInput === reversed}`);
-          }
-        });
-      }
-    }
-  };
+  // Add state for debug data
+  const [debugData, setDebugData] = useState<{
+    originalCode: string;
+    modifiedCode: string;
+    fullResponse: any;
+    rawStdout?: string;
+    rawStderr?: string;
+    debugLines?: string[];
+  } | null>(null);
   
-  // Celebrate success with confetti
-  const celebrateSuccess = () => {
-    setShowConfetti(true);
-    
-    // Auto-hide confetti after a few seconds
-    setTimeout(() => {
-      setShowConfetti(false);
-    }, 5000);
-  };
+  // Handle running tests
+  const handleTestRun = useCallback(async (
+    results: TestResults | null, 
+    isRunning: boolean,
+    setDebugMsg: (msg: string) => void
+  ) => {
+    try {
+      setIsRunningTests(isRunning);
+      
+      // If results are being passed in, just display them
+      if (results) {
+        console.log('Test run results:', results);
+        setActiveView('output');
+        
+        // Create debug data even if it wasn't provided
+        if (!results.debugData && debugState.isEnabled()) {
+          // Create a basic debug data object from what we have
+          const basicDebugData = {
+            originalCode: "// Original code wasn't captured",
+            modifiedCode: "// Modified code wasn't captured",
+            fullResponse: { status: { description: "Test run completed" } },
+            rawStdout: JSON.stringify(results, null, 2),
+            rawStderr: "",
+            debugLines: []
+          };
+          
+          // Attach this debug data to all test results
+          results.debugData = basicDebugData;
+          if (results.passedTests) {
+            results.passedTests.forEach(test => test.debugInfo = basicDebugData);
+          }
+          if (results.failedTests) {
+            results.failedTests.forEach(test => test.debugInfo = basicDebugData);
+          }
+        }
+        
+        setTestResults(results);
+        return;
+      }
+      
+    } catch (error) {
+      console.error('Error in handleTestRun:', error);
+      setDebugMsg('Error running tests. Please try again.');
+      setIsRunningTests(false);
+    }
+  }, []);
   
   // Submit solution for judging
-  const handleSubmitSolution = async (
-    userCode: string, 
+  const handleSubmitSolution = useCallback(async (
+    userCode: string,
     selectedLanguage: string,
     setDebugMsg: (msg: string) => void
   ) => {
-    if (!currentQuestion || !user?.email) return;
+    if (!user?.email || !currentQuestion) {
+      setDebugMsg('You must be logged in and have a problem selected to submit.');
+      return;
+    }
     
-    setDebugMsg('Submitting solution...');
-    setIsSubmitting(true); // Start loading animation
+    if (!userCode || userCode.trim() === '') {
+      setDebugMsg('Please enter some code before submitting.');
+      return;
+    }
     
     try {
-      // Prepare submission for Judge0
-      const languageId = LANGUAGE_IDS[selectedLanguage as keyof typeof LANGUAGE_IDS];
-      if (!languageId) {
-        throw new Error(`Unsupported language: ${selectedLanguage}`);
-      }
-
-      // Separate visible and hidden tests for debugging
-      const visibleTests = currentQuestion.testCases.filter(test => !test.isHidden);
-      const hiddenTests = currentQuestion.testCases.filter(test => test.isHidden);
+      setIsSubmitting(true);
+      setActiveView('output');
       
-      console.log('Visible tests:', visibleTests.length, visibleTests);
-      console.log('Hidden tests:', hiddenTests.length, hiddenTests);
-      
-      // Properly format ALL test cases to ensure expected field is populated
-      const formattedTestCases = currentQuestion.testCases.map(test => ({
-        input: test.input,
-        expected: test.output // Ensure expected field is populated from output
+      // Build the test cases from the problem
+      const testCases = currentQuestion.testCases.map(tc => ({
+        input: tc.input,
+        expected: tc.output
       }));
-
-      const submissionPayload = {
+      
+      // Prepare test data for Judge0
+      const testData = JSON.stringify({
+        testCases,
+        fnName: currentQuestion.functionName || extractFunctionName(userCode, selectedLanguage)
+      });
+      
+      // Get language ID
+      const languageId = selectedLanguage === 'javascript' ? 
+        LANGUAGE_IDS.javascript : 
+        LANGUAGE_IDS.python;
+        
+      // Generate the modified code with test runner
+      const modifiedCode = getTestRunner(userCode, languageId);
+      
+      // Submit to Judge0
+      console.log('Submitting solution to Judge0...');
+      console.log('Language:', selectedLanguage, 'ID:', languageId);
+      
+      const result = await submissionService.submitCode({
         source_code: userCode,
         language_id: languageId,
-        stdin: JSON.stringify({ testCases: formattedTestCases }), // Use properly formatted test cases
-      };
-
-      // Use submitCode which runs the embedded test runner
-      const result: JudgeResult = await submissionService.submitCode(submissionPayload);
+        stdin: testData
+      });
       
-      console.log('Submission result:', result);
-
-      // Check Judge0 status first
-      if (result.status.id === JUDGE_STATUS.ACCEPTED) {
-        // If accepted, parse the stdout which contains our test runner JSON output
-        if (result.stdout) {
+      // Store debug data - IMPORTANT: Include the entire Judge0 response
+      const debugInfo = {
+        originalCode: userCode,
+        modifiedCode: modifiedCode,
+        fullResponse: result,
+        rawStdout: result.stdout || "",
+        rawStderr: result.stderr || "",
+        // Add this line to immediately parse and save debug info from the stdout
+        debugLines: (() => {
           try {
-            const runnerOutput = JSON.parse(result.stdout);
-            if (runnerOutput.summary) {
-              const passed = runnerOutput.summary.passed;
-              const total = runnerOutput.summary.total;
-              
-              // If all tests passed, update score and show celebration
-              if (passed === total) {
-                // Update local score state
-                const updatedScores = { ...playerScores };
-                const userEmail = user.email || '';
-                updatedScores[userEmail] = (updatedScores[userEmail] || 0) + 1;
-                setPlayerScores(updatedScores);
-                
-                // Add to completed questions
-                const updatedCompletedQuestions = { ...completedQuestions };
-                if (!updatedCompletedQuestions[userEmail]) {
-                  updatedCompletedQuestions[userEmail] = [];
-                }
-                
-                // Only add to completed if not already present
-                if (!updatedCompletedQuestions[userEmail].includes(currentQuestion.id)) {
-                  updatedCompletedQuestions[userEmail].push(currentQuestion.id);
-                  setCompletedQuestions(updatedCompletedQuestions);
-                  
-                  // Broadcast the update to other clients
-                  const completedChannel = supabase.channel('completed_questions', {
-                    config: {
-                      broadcast: { self: true }
-                    }
-                  });
-                  
-                  completedChannel.subscribe(async (status) => {
-                    if (status === 'SUBSCRIBED') {
-                      await completedChannel.send({
-                        type: 'broadcast',
-                        event: 'question_completed',
-                        payload: { 
-                          completedQuestions: updatedCompletedQuestions,
-                          user: userEmail,
-                          questionId: currentQuestion.id,
-                          timestamp: new Date().toISOString()
-                        }
-                      });
-                      
-                      setTimeout(() => {
-                        completedChannel.unsubscribe();
-                      }, 1000);
-                    }
-                  });
-                }
-                
-                setDebugMsg(`🎉 Solution successful: ${passed}/${total} tests passed!`);
-                
-                // Show celebration animation
-                celebrateSuccess();
-                
-                // Broadcast score update with proper subscription
-                const scoreChannel = supabase.channel('battle_scores', {
-                  config: {
-                    broadcast: { self: true } // Allow self-receiving to ensure all clients get updates
-                  }
-                });
-                
-                scoreChannel.subscribe(async (status) => {
-                  if (status !== 'SUBSCRIBED') {
-                    console.log('Score channel status:', status);
-                    return;
-                  }
-                  
-                  console.log('Score channel subscribed, broadcasting score update');
-                  
-                  await scoreChannel.send({
-                    type: 'broadcast',
-                    event: 'score_update',
-                    payload: { 
-                      scores: updatedScores,
-                      user: userEmail,
-                      timestamp: new Date().toISOString()
-                    }
-                  });
-                  
-                  console.log('Score update broadcast sent');
-                  
-                  // Unsubscribe after sending to avoid keeping too many channels open
-                  setTimeout(() => {
-                    scoreChannel.unsubscribe();
-                  }, 1000);
-                });
-              } else {
-                // Some tests failed
-                // Get more detailed info about the failures
-                const failedTests = runnerOutput.results?.filter((r: any) => !r.passed) || [];
-                
-                // Check if these are hidden test cases
-                let hiddenFailures = 0;
-                let visibleFailures = 0;
-                
-                const visibleTestCount = visibleTests?.length || 0;
-                
-                failedTests.forEach((failedTest: any, index: number) => {
-                  // Try to determine if this is a hidden test by matching input
-                  const matchesVisibleTest = visibleTests.some(t => t.input === failedTest.input);
-                  if (!matchesVisibleTest) {
-                    console.log(`Hidden test failed:`, failedTest);
-                    hiddenFailures++;
-                  } else {
-                    console.log(`Visible test failed:`, failedTest);
-                    visibleFailures++;
-                  }
-                });
-                
-                if (hiddenFailures > 0) {
-                  setDebugMsg(`❌ Failed: ${passed}/${total} tests passed. Your code may work for the ${visibleTestCount - visibleFailures} visible test cases but fails on ${hiddenFailures} hidden test cases that check edge cases!`);
-                } else {
-                  setDebugMsg(`❌ Failed: ${passed}/${total} tests passed. Check the test results for details.`);
-                }
+            // Try to extract debug lines from stdout
+            if (result.stdout) {
+              const jsonStartIndex = result.stdout.indexOf('{');
+              if (jsonStartIndex !== -1) {
+                const jsonPart = result.stdout.substring(jsonStartIndex);
+                const parsed = JSON.parse(jsonPart);
+                return parsed.debug || [];
               }
-              
-              // Ensure test results have expected field populated from output field
-              if (runnerOutput.testResults) {
-                const formattedResults = {
-                  ...runnerOutput,
-                  passedTests: runnerOutput.passedTests?.map((test: any) => ({
-                    ...test,
-                    expected: test.expected || test.output
-                  })),
-                  failedTests: runnerOutput.failedTests?.map((test: any) => ({
-                    ...test,
-                    expected: test.expected || test.output
-                  }))
-                };
-                setTestResults(formattedResults);
-                setActiveView('output');
-              }
-            } else {
-              throw new Error('Test runner output format invalid (missing summary)');
             }
-          } catch (parseError) {
-            console.error('Error parsing submission output:', parseError, result.stdout);
-            setDebugMsg('Error processing submission results.');
+            // If we can't extract from stdout, try stderr
+            if (result.stderr) {
+              return result.stderr.split('\n');
+            }
+            return [];
+          } catch (e) {
+            console.error('Error parsing debug lines:', e);
+            return [];
           }
+        })()
+      };
+      
+      console.log('DEBUG INFO CAPTURED:', debugInfo);
+      setDebugData(debugInfo);
+      
+      console.log('Judge0 result:', result);
+      
+      if (result.status.id !== JUDGE_STATUS.ACCEPTED) {
+        // Handle error case
+        if (result.compile_output) {
+          setDebugMsg(`Compilation error: ${result.compile_output}`);
+        } else if (result.stderr) {
+          setDebugMsg(`Runtime error: ${result.stderr}`);
         } else {
-          setDebugMsg('Submission ran, but no output received.');
+          setDebugMsg(`Error: ${result.status.description}`);
+        }
+        
+        // Even for errors, include debug info
+        setTestResults({
+          passed: 0,
+          total: testCases.length,
+          passedTests: [],
+          failedTests: testCases.map((tc, i) => ({
+            index: i + 1,
+            input: tc.input,
+            expected: tc.expected,
+            actual: 'Error: ' + (result.stderr || result.compile_output || result.status.description),
+            logs: [],
+            debugInfo: debugInfo // Include debug info even for errors
+          })),
+          userLogs: [],
+          debugData: debugInfo
+        });
+        
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Parse the results
+      let processedResults;
+      if (result.stdout) {
+        try {
+          // Find the start of the JSON in the output
+          const jsonStartIndex = result.stdout.indexOf('{');
+          if (jsonStartIndex !== -1) {
+            const jsonPart = result.stdout.substring(jsonStartIndex);
+            processedResults = JSON.parse(jsonPart);
+            
+            // Save the debug section if available
+            if (processedResults.debug) {
+              (debugInfo as any).debugLines = processedResults.debug;
+            }
+          } else {
+            throw new Error('Could not find JSON in output');
+          }
+        } catch (e) {
+          console.error('Error parsing Judge0 output:', e);
+          setDebugMsg('Error parsing test results. Please try again.');
+          setIsSubmitting(false);
+          return;
         }
       } else {
-        // Handle other Judge0 statuses (Compile Error, Runtime Error, etc.)
-        setDebugMsg(`Submission Failed: ${result.status.description}. ${result.stderr || result.compile_output || result.message || ''}`);
+        setDebugMsg('No output received from Judge0. Please try again.');
+        setIsSubmitting(false);
+        return;
       }
-
+      
+      console.log('Processed results:', processedResults);
+      
+      // Format test results for display
+      const formattedResults: TestResults = {
+        passed: processedResults.summary?.passed || 0,
+        total: processedResults.summary?.total || testCases.length,
+        passedTests: (processedResults.results || [])
+          .filter((r: any) => r.passed)
+          .map((r: any) => {
+            // Always include debug info when debug mode is enabled
+            return {
+              index: r.originalIndex + 1,
+              input: r.input,
+              expected: r.expected,
+              actual: r.output,
+              logs: r.logs || [],
+              debugInfo: debugState.isEnabled() ? debugInfo : undefined // Directly include the full debug info
+            };
+          }),
+        failedTests: (processedResults.results || [])
+          .filter((r: any) => !r.passed)
+          .map((r: any) => ({
+            index: r.originalIndex + 1,
+            input: r.input,
+            expected: r.expected,
+            actual: r.output,
+            logs: r.logs || [],
+            debugInfo: debugState.isEnabled() ? debugInfo : undefined // Directly include the full debug info
+          })),
+        userLogs: processedResults.userLogs || [],
+        debugData: debugState.isEnabled() ? debugInfo : undefined // Include full debug info at the top level
+      };
+      
+      setTestResults(formattedResults);
+      
+      // Check if all tests passed
+      const allTestsPassed = formattedResults.passed === formattedResults.total;
+      
+      if (allTestsPassed) {
+        // Success! Update scores and celebrate
+        await celebrateSuccess(user.email, currentQuestion);
+      }
+      
+      setIsSubmitting(false);
+      
     } catch (error) {
-      console.error('Error submitting solution:', error);
-      setDebugMsg(`Error submitting: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsSubmitting(false); // End loading animation
+      console.error('Error in handleSubmitSolution:', error);
+      setDebugMsg('Error submitting solution. Please try again.');
+      setIsSubmitting(false);
     }
-  };
+  }, [user, currentQuestion]);
+  
+  // Function to celebrate success and update scores
+  const celebrateSuccess = useCallback(async (
+    userEmail: string, 
+    problem: CodeProblem
+  ) => {
+    try {
+      // Show confetti!
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 3000);
+      
+      // Add to completed questions
+      setCompletedQuestions(prev => {
+        const updatedCompleted = { ...prev };
+        if (!updatedCompleted[userEmail]) {
+          updatedCompleted[userEmail] = [];
+        }
+        if (!updatedCompleted[userEmail].includes(problem.id)) {
+          updatedCompleted[userEmail] = [...updatedCompleted[userEmail], problem.id];
+        }
+        return updatedCompleted;
+      });
+      
+      // Update score (assuming problem difficulty determines points)
+      const scoreToAdd = problem.difficulty === 'easy' ? 10 : 
+                        problem.difficulty === 'medium' ? 20 : 30;
+      
+      const newScore = (playerScores[userEmail] || 0) + scoreToAdd;
+      
+      // Update local state first for responsive UI
+      setPlayerScores(prev => ({
+        ...prev,
+        [userEmail]: newScore
+      }));
+      
+      // Broadcast score update to all users
+      const channel = supabase.channel('battle_scores_listener');
+      await channel.subscribe();
+      
+      const result = await channel.send({
+        type: 'broadcast',
+        event: 'score_update',
+        payload: { 
+          scores: {
+            ...playerScores,
+            [userEmail]: newScore
+          }
+        }
+      });
+      
+      console.log('Score update broadcast result:', result);
+      
+    } catch (error) {
+      console.error('Error in celebrateSuccess:', error);
+    }
+  }, [playerScores]);
   
   return {
     testResults,
@@ -310,6 +379,7 @@ export const useSubmissionHandler = (user: any, currentQuestion: CodeProblem | n
     setShowConfetti,
     handleTestRun,
     handleSubmitSolution,
-    celebrateSuccess
+    celebrateSuccess,
+    debugData
   };
 }; 

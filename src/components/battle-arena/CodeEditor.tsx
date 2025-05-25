@@ -9,6 +9,7 @@ import { formatTime, getFreezeRemainingTime } from '../../utils/battleUtils';
 import { Button } from "@/components/ui/button";
 import { CodeProblem } from '../../services/problemService';
 import { submissionService, LANGUAGE_IDS, JudgeResult, JUDGE_STATUS } from '../../services/submissionService';
+import { debugState } from '../../config/debugManager';
 
 export interface TestResultItemDetails {
   input: string;
@@ -21,9 +22,36 @@ export interface TestResultItemDetails {
 export interface TestResults {
   passed: number;
   total: number;
-  failedTests?: TestResultItemDetails[];
-  passedTests?: TestResultItemDetails[];
-  userLogs?: string[];
+  passedTests: {
+    index: number;
+    input: string;
+    expected: string;
+    actual: string;
+    logs?: string[];
+    debugInfo?: {
+      originalCode?: string;
+      modifiedCode?: string;
+      fullResponse?: any;
+    };
+  }[];
+  failedTests: {
+    index: number;
+    input: string;
+    expected: string;
+    actual: string;
+    logs?: string[];
+    debugInfo?: {
+      originalCode?: string;
+      modifiedCode?: string;
+      fullResponse?: any;
+    };
+  }[];
+  userLogs: string[];
+  debugData?: {
+    originalCode: string;
+    modifiedCode: string;
+    fullResponse: any;
+  } | null;
 }
 
 interface CodeEditorProps {
@@ -76,6 +104,8 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   isSubmitting = false
 }) => {
   const [isRunningTests, setIsRunningTests] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [debugData, setDebugData] = useState<any>(null);
 
   // Run test cases
   const runTestCases = async () => {
@@ -267,6 +297,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
                 index: i + 1,
                 logs: userLogs // Add logs to each test for visibility
               })),
+              passedTests: [],
               userLogs
             };
             
@@ -278,6 +309,17 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
       } else {
         // Handle other Judge0 statuses (Compile Error, Runtime Error, etc.)
         setDebugMsg(`Test Execution Failed: ${result.status.description}. ${result.stderr || result.compile_output || result.message || ''}`);
+      }
+      
+      // Capture debug data when in debug mode
+      if (debugState.isEnabled()) {
+        setDebugData({
+          originalCode: userCode,
+          modifiedCode: submissionCode,
+          response: result,
+          rawStdout: result.stdout,
+          rawStderr: result.stderr
+        });
       }
       
       onTestRun(testResults, false); // Pass processed results (or null if error) to parent
@@ -348,42 +390,95 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
       </div>
       
       <div className="bg-gray-800 p-3 flex flex-col gap-3 rounded-b-lg">
-        <div className="flex gap-2">
-          <Button
-            variant="success"
-            disabled={editorFrozen || !isQuestionSelected || isRunningTests}
-            onClick={runTestCases}
-          >
-            {isRunningTests ? (
-              <div className="flex items-center">
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Running...
-              </div>
-            ) : (
-              'Run Tests'
+        <div className="flex justify-between items-center mt-4">
+          <div>
+            {/* Add debug button when debug mode is enabled */}
+            {debugState.isEnabled() && (
+              <Button
+                className="bg-purple-700 text-white hover:bg-purple-600 mr-2"
+                onClick={() => {
+                  setShowDebugPanel(!showDebugPanel);
+                }}
+              >
+                Debug Info
+              </Button>
             )}
-          </Button>
+            
+            <Button
+              className="bg-green-600 text-white hover:bg-green-500"
+              disabled={!isQuestionSelected || isRunningTests}
+              onClick={() => {
+                if (isQuestionSelected && !isRunningTests) {
+                  onTestRun(null, true);
+                  
+                  // Send code to backend
+                  runTestCases();
+                }
+              }}
+            >
+              Run Tests
+            </Button>
+          </div>
           
           <Button
-            className={`relative overflow-hidden ${isSubmitting ? 'bg-indigo-700' : 'bg-indigo-600 hover:bg-indigo-700'} text-white font-medium shadow-md`}
-            disabled={editorFrozen || !isQuestionSelected || isSubmitting}
-            onClick={onSubmitSolution}
+            className="bg-indigo-600 text-white hover:bg-indigo-500"
+            disabled={!isQuestionSelected || isSubmitting}
+            onClick={() => {
+              if (isQuestionSelected && !isSubmitting) {
+                onSubmitSolution();
+              }
+            }}
           >
-            <div className="flex items-center">
-              {isSubmitting && (
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-              )}
-              {isSubmitting ? 'Submitting...' : 'Submit Solution'}
-            </div>
+            Submit Solution
           </Button>
         </div>
       </div>
+      
+      {/* Debug panel */}
+      {debugState.isEnabled() && showDebugPanel && debugData && (
+        <div className="mt-4 border border-indigo-700 rounded-md bg-gray-900/80 p-4">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-indigo-400 font-medium">Debug Information</h3>
+            <Button 
+              size="sm" 
+              variant="outline"
+              className="text-xs border-indigo-600 hover:bg-indigo-800/50"
+              onClick={() => setShowDebugPanel(false)}
+            >
+              Close
+            </Button>
+          </div>
+          
+          <div className="space-y-3 text-xs">
+            {debugData.response && (
+              <div className="bg-gray-800 p-2 rounded">
+                <div className="text-indigo-300 font-medium mb-1">Judge0 Response Status</div>
+                <pre className="text-green-400 whitespace-pre-wrap">
+                  {debugData.response.status ? `${debugData.response.status.id}: ${debugData.response.status.description}` : 'Status unavailable'}
+                </pre>
+              </div>
+            )}
+            
+            {debugData.rawStdout && (
+              <div className="bg-gray-800 p-2 rounded">
+                <div className="text-indigo-300 font-medium mb-1">stdout Output</div>
+                <pre className="text-white whitespace-pre-wrap overflow-auto max-h-32">
+                  {debugData.rawStdout}
+                </pre>
+              </div>
+            )}
+            
+            {debugData.rawStderr && (
+              <div className="bg-gray-800 p-2 rounded">
+                <div className="text-indigo-300 font-medium mb-1">stderr Output</div>
+                <pre className="text-red-300 whitespace-pre-wrap overflow-auto max-h-32">
+                  {debugData.rawStderr}
+                </pre>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
