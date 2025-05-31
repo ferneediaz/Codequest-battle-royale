@@ -11,7 +11,37 @@ import json
 import traceback
 import inspect
 import io
+import re
 from contextlib import redirect_stdout
+
+def parse_input_parameters(input_str):
+    """
+    Parse input parameters from various formats
+    
+    Args:
+        input_str: A string like "\"anagram\", \"nagaram\"" or other formatted input
+        
+    Returns:
+        The properly parsed arguments list
+    """
+    # First try to parse as JSON
+    try:
+        # If it's a valid JSON array, return it directly
+        if input_str.strip().startswith('[') and input_str.strip().endswith(']'):
+            return json.loads(input_str)
+    except Exception as e:
+        print(f"DEBUG: Failed to parse as JSON: {e}", file=sys.stderr)
+    
+    # If input is comma-separated strings like "\"string1\", \"string2\""
+    if ',' in input_str and '"' in input_str:
+        # Extract quoted strings using regex
+        matches = re.findall(r'"([^"]*)"', input_str)
+        if matches:
+            print(f"DEBUG: Extracted strings from quotes: {matches}", file=sys.stderr)
+            return matches
+    
+    # Return original input as single element list if all else fails
+    return [input_str]
 
 def process_test_cases():
     try:
@@ -30,7 +60,8 @@ def process_test_cases():
         # Find all user-defined functions
         user_functions = [name for name, obj in globals().items() 
                          if callable(obj) and not name.startswith('__') 
-                         and name != 'process_test_cases']
+                         and name != 'process_test_cases'
+                         and name != 'parse_input_parameters']
         
         print("DEBUG: Found functions: " + str(user_functions), file=sys.stderr)
         
@@ -68,8 +99,8 @@ def process_test_cases():
                 print("DEBUG: Processing test case " + str(i+1), file=sys.stderr)
                 print("DEBUG: Input: " + test.get('input', ''), file=sys.stderr)
                 
-                # Parse the input as an array of arguments
-                args = json.loads(test.get('input', '[]'))
+                # Parse the input using our custom parser
+                args = parse_input_parameters(test.get('input', '[]'))
                 print("DEBUG: Parsed args: " + str(args), file=sys.stderr)
                 
                 # Use redirect_stdout to safely capture print statements
@@ -106,9 +137,10 @@ def process_test_cases():
                 else:
                     print("DEBUG: No captured output for this test", file=sys.stderr)
                 
-                print("DEBUG: Raw result: " + str(result), file=sys.stderr)
+                print("DEBUG: Raw result type:", type(result), file=sys.stderr)
+                print("DEBUG: Raw result value:", result, file=sys.stderr)
                 
-                # Format the result
+                # Format the result based on its type
                 if result is None:
                     formatted_result = "null"
                 elif isinstance(result, bool):
@@ -116,6 +148,8 @@ def process_test_cases():
                 elif isinstance(result, (int, float)):
                     formatted_result = str(result)
                 else:
+                    # For all other types, convert to JSON
+                    # Note: collections.Counter will not work correctly with equality comparisons
                     formatted_result = json.dumps(result)
                 
                 print("DEBUG: Formatted result: " + formatted_result, file=sys.stderr)
@@ -125,17 +159,16 @@ def process_test_cases():
                 if i == 0:
                     direct_output = formatted_result
                 
-                # Get expected output
-                expected = test.get('expected', '')
-                passed = formatted_result == expected
-                print("DEBUG: Expected: " + expected, file=sys.stderr)
+                # Check if test passed
+                passed = formatted_result == test.get('expected', '')
+                print("DEBUG: Expected: " + test.get('expected', ''), file=sys.stderr)
                 print("DEBUG: Passed: " + str(passed), file=sys.stderr)
                 
                 # Add to results with logs for this specific test
                 results.append({
                     "input": test.get('input', ''),
                     "output": formatted_result,
-                    "expected": expected,
+                    "expected": test.get('expected', ''),
                     "passed": passed,
                     "logs": test_logs.copy(),  # Make a copy to ensure isolation
                     "originalIndex": i  # Store original index for sorting
@@ -189,6 +222,8 @@ def process_test_cases():
 print('# Note: Use f-strings or str() for combining values in Python', file=sys.stderr)
 print('# CORRECT: print(f"Array: {prices}, Value: {123123}")', file=sys.stderr)
 print('# WRONG: print(prices + "here i am" + 123123)', file=sys.stderr)
+print('# WARNING: collections.Counter equality (Counter(s) == Counter(t)) is not supported in the test runner', file=sys.stderr)
+print('# Instead, use sorted(s) == sorted(t) for anagram checking', file=sys.stderr)
 
 # Run the processing
 process_test_cases()

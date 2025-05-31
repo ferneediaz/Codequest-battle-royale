@@ -68,6 +68,37 @@ if (isLinkedListProblem) {
 // Detect if user wrote their own console.log
 const userHasConsoleLog = /console\\.log\\s*\\(/.test(codeWithoutComments);
 
+/**
+ * Parses comma-separated string inputs into proper JavaScript arguments
+ * 
+ * @param input - A string like "\"anagram\", \"nagaram\"" or other formatted input
+ * @returns The properly parsed arguments array
+ */
+function parseInputParameters(input) {
+  // If input is already in array format, return it
+  if (input.trim().startsWith('[') && input.trim().endsWith(']')) {
+    try {
+      return JSON.parse(input);
+    } catch (e) {
+      debug('Failed to parse input as JSON array:', e);
+    }
+  }
+
+  // If input is comma-separated strings like "\"string1\", \"string2\""
+  if (input.includes(',') && input.includes('"')) {
+    // Extract quoted strings using regex
+    const regex = /"([^"]*)"/g;
+    const matches = [...input.matchAll(regex)];
+    if (matches.length > 0) {
+      debug('Extracted strings from quotes:', matches.map(m => m[1]));
+      return matches.map(match => match[1]);
+    }
+  }
+
+  // Return original input as single element array if all else fails
+  return [input];
+}
+
 // Process input
 let input = '';
 rl.on('line', (line) => {
@@ -110,30 +141,13 @@ rl.on('close', () => {
         debug("Input:", test.input);
         debug("Expected:", test.expected);
         
-        // Parse the input
-        let parsedInput = null;
-        try {
-          parsedInput = JSON.parse(test.input);
-          debug("Successfully parsed JSON input:", JSON.stringify(parsedInput));
-        } catch (e) {
-          debug("Failed to parse as JSON, trying to handle legacy format:", test.input);
-          // Handle the legacy format "[1,2,3], 4" by converting it to [[1,2,3], 4]
-          const legacyMatch = test.input.match(/^(\\[.+\\]),\\s*(.+)$/);
-          if (legacyMatch) {
-            try {
-              const arrayPart = JSON.parse(legacyMatch[1]);
-              const valuePart = JSON.parse(legacyMatch[2]);
-              parsedInput = [arrayPart, valuePart];
-              debug("Successfully converted legacy format to:", JSON.stringify(parsedInput));
-            } catch (e2) {
-              debug("Failed to parse legacy format:", e2.message);
-              parsedInput = test.input;
-            }
-          } else {
-            debug("Using input as-is (not valid JSON):", test.input);
-            parsedInput = test.input;
-          }
-        }
+        // Parse the input using our parameter parsing function
+        const args = parseInputParameters(test.input);
+        debug("Parsed arguments:", JSON.stringify(args));
+        
+        // Format arguments for eval
+        const argsStr = args.map(arg => JSON.stringify(arg)).join(', ');
+        debug("Formatted args string:", argsStr);
         
         // Attempt to call the function
         let result = null;
@@ -148,33 +162,26 @@ rl.on('close', () => {
           }
           return dummy.next;
         }
+        
         // Handle linked list input for linked list problems
-        if (isLinkedListProblem && Array.isArray(parsedInput)) {
+        if (isLinkedListProblem && Array.isArray(args) && args.length === 1 && Array.isArray(args[0])) {
           debug("Creating linked list from array for " + functionName);
-          const linkedList = createLinkedList(parsedInput);
+          const linkedList = createLinkedList(args[0]);
           debug("Calling " + functionName + " with linked list");
           result = eval(\`\${functionName}(linkedList)\`);
           debug("Raw result from linked list call:", result);
-        } 
-        // Handle array with 2 elements where first is array - common for binary search etc
-        else if (Array.isArray(parsedInput) && parsedInput.length === 2 && Array.isArray(parsedInput[0])) {
-          debug("Calling " + functionName + " with array and value");
-          result = eval(\`\${functionName}(\${JSON.stringify(parsedInput[0])}, \${JSON.stringify(parsedInput[1])})\`);
+        } else {
+          // Use the parsed arguments
+          debug("Calling " + functionName + " with parsed arguments");
+          result = eval(\`\${functionName}(\${argsStr})\`);
+          debug("Raw result:", result);
         }
-        // Just pass array directly as the most common case
-        else if (Array.isArray(parsedInput)) {
-          debug("Calling " + functionName + " with array");
-          result = eval(\`\${functionName}(\${JSON.stringify(parsedInput)})\`);
-        }
-        // Not an array
-        else {
-          debug("Calling " + functionName + " with single value");
-          result = eval(\`\${functionName}(\${JSON.stringify(parsedInput)})\`);
-        }
+        
         // Format the result for output
         let formattedResult;
         debug("Raw result type:", typeof result);
         debug("Raw result value:", JSON.stringify(result));
+        
         // Special handling for linked list problems
         if (isLinkedListProblem) {
           debug("Processing result as a linked list result");
@@ -213,11 +220,13 @@ rl.on('close', () => {
             debug("Formatted as JSON:", formattedResult);
           }
         }
+        
         const expected = test.expected || "";
         const passed = formattedResult === expected;
         debug("Expected result:", expected);
         debug("Actual formatted result:", formattedResult);
         debug("Test passed:", passed);
+        
         results.push({
           input: test.input,
           output: formattedResult,
@@ -226,6 +235,7 @@ rl.on('close', () => {
           logs: testLogs.slice(), // Create a copy to ensure isolation
           originalIndex: index // Store the original index to maintain order
         });
+        
         if (index === 0) {
           directOutput = formattedResult;
         }
@@ -239,41 +249,38 @@ rl.on('close', () => {
           expected: test.expected || "",
           passed: false,
           logs: testLogs.slice(), // Create a copy to ensure isolation
-          originalIndex: index // Store the original index to maintain order
+          originalIndex: index
         });
       } finally {
-        // No need to restore console.log here as we'll do it once at the end
-        // We want to keep capturing logs across all tests
+        // Restore console.log for the next test
+        console.log = originalConsoleLog;
       }
     });
-
-    // Don't sort the results - preserve the original order to maintain log correspondence
-    // Or restore the original test order after sorting
-    results.sort((a, b) => {
-      // First preserve order by original index
-      return a.originalIndex - b.originalIndex;
-    });
-
+    
+    // Sort results to maintain original order
+    results.sort((a, b) => a.originalIndex - b.originalIndex);
+    
+    // Create final output
     const output = {
-      directOutput: directOutput,
-      results: results,
+      directOutput,
+      results,
       summary: {
         total: results.length,
         passed: results.filter(r => r.passed).length
       },
-      debug: debugInfo,
-      userLogs: allUserLogs
+      userLogs: allUserLogs,
+      debug: debugInfo
     };
-    debug("Final summary:", \`\${output.summary.passed}/\${output.summary.total} tests passed\`);
-    debug("TEST RUNNER DEBUG ENDS");
     
-    // Now restore the original console.log at the very end, after all tests
-    console.log = originalConsoleLog;
+    debug("Final summary:", output.summary.passed + "/" + output.summary.total + " tests passed");
+    debug("Final output:", JSON.stringify(output).substring(0, 200) + "...");
+    
+    // Output the result
     console.log(JSON.stringify(output));
+    
   } catch (error) {
-    debug("FATAL ERROR in test runner:", error.message);
+    debug("FATAL ERROR:", error.message);
     debug("Error stack:", error.stack);
-    console.log = originalConsoleLog;
     console.log(JSON.stringify({
       error: error.message,
       debug: debugInfo,
@@ -281,5 +288,6 @@ rl.on('close', () => {
       summary: { total: 0, passed: 0 }
     }));
   }
-});`;
+});
+`;
 } 
