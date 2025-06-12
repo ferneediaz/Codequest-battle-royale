@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import FloatingCodeBackground from '@/components/FloatingCodeBackground';
-import { Shield, Crown, Sword, Users, Copy, ArrowRight, UserPlus2, RefreshCw } from "lucide-react";
+import { Shield, Crown, Sword, Users, Copy, ArrowRight, UserPlus2, RefreshCw, Check } from "lucide-react";
 import CodeQuestLogo from "@/components/CodeQuestLogo";
 import { v4 as uuidv4 } from 'uuid';
 
@@ -218,12 +218,13 @@ const GameSetupPage = () => {
                     readOnly
                   />
                   <Button 
-                    variant="outline" 
-                    className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                    size="icon"
+                    aria-label="Regenerate Room ID"
+                    className="bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-2 focus-visible:ring-indigo-400"
                     onClick={regenerateRoomId}
                     title="Generate new ID"
                   >
-                    <RefreshCw size={16} />
+                    <RefreshCw size={20} />
                   </Button>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
@@ -295,18 +296,19 @@ const GameSetupPage = () => {
               </p>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               <Input
                 className="bg-slate-800 border-slate-700 text-white"
                 value={`${window.location.origin}/#/join/${roomId}`}
                 readOnly
               />
               <Button 
-                variant="outline" 
-                className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                size="icon"
+                aria-label="Copy Invite Link"
+                className="bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-2 focus-visible:ring-indigo-400"
                 onClick={copyInviteLink}
               >
-                {linkCopied ? 'Copied!' : <Copy size={16} />}
+                {linkCopied ? <Check size={20} className="text-white" /> : <Copy size={20} className="text-white" />}
               </Button>
             </div>
           </div>
