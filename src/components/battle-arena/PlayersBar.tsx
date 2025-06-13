@@ -15,35 +15,35 @@ interface PlayersBarProps {
 }
 
 // Temporary function to simulate extra players if needed
-const generateExtraPlayers = (count: number, existingUsers: string[]) => {
-  const possiblePlayers = [
-    'player1@example.com',
-    'player2@example.com',
-    'player3@example.com',
-    'player4@example.com',
-    'coolgamer5@example.com',
-    'prodev6@example.com',
-    'ninja7@example.com',
-    'coder8@example.com',
-    'dev9@example.com',
-    'user10@example.com',
-    'gamer11@example.com',
-    'challenger12@example.com',
-    'warrior13@example.com',
-    'expert14@example.com',
-    'wizard15@example.com',
-    'master16@example.com',
-    'hacker17@example.com',
-    'coder18@example.com',
-    'programmer19@example.com',
-  ];
+// const generateExtraPlayers = (count: number, existingUsers: string[]) => {
+  // const possiblePlayers = [
+  //   'player1@example.com',
+  //   'player2@example.com',
+  //   'player3@example.com',
+  //   'player4@example.com',
+  //   'coolgamer5@example.com',
+  //   'prodev6@example.com',
+  //   'ninja7@example.com',
+  //   'coder8@example.com',
+  //   'dev9@example.com',
+  //   'user10@example.com',
+  //   'gamer11@example.com',
+  //   'challenger12@example.com',
+  //   'warrior13@example.com',
+  //   'expert14@example.com',
+  //   'wizard15@example.com',
+  //   'master16@example.com',
+  //   'hacker17@example.com',
+  //   'coder18@example.com',
+  //   'programmer19@example.com',
+  // ];
   
   // Filter out already connected users
-  const availablePlayers = possiblePlayers.filter(p => !existingUsers.includes(p));
+  // const availablePlayers = possiblePlayers.filter(p => !existingUsers.includes(p));
   
   // Return the requested number of players or all available if count is greater
-  return availablePlayers.slice(0, Math.min(count, availablePlayers.length));
-};
+//   return availablePlayers.slice(0, Math.min(count, availablePlayers.length));
+// };
 
 // Custom CSS for the component
 const scrollbarStyles = `
@@ -77,37 +77,25 @@ const PlayersBar: React.FC<PlayersBarProps> = ({
   onUseSkill
 }) => {
   const [displayMode, setDisplayMode] = useState<'scroll' | 'grid'>('grid');
-  const minDesiredPlayers = 20; // Minimum number of players to show
+  // const minDesiredPlayers = 20; // Minimum number of players to show
   
   // Combine real users with simulated users if needed
-  const extraPlayersNeeded = Math.max(0, minDesiredPlayers - connectedUsers.length);
-  const extraPlayers = generateExtraPlayers(extraPlayersNeeded, connectedUsers);
+  // const extraPlayersNeeded = Math.max(0, minDesiredPlayers - connectedUsers.length);
+  // const extraPlayers = generateExtraPlayers(extraPlayersNeeded, connectedUsers);
   
   // Combine real users with extra simulated users
-  const allUsers = [...connectedUsers, ...extraPlayers];
+  // const allUsers = [...connectedUsers, ...extraPlayers];
   
   // Get character count for a user (only real users have counts)
   const getCharCount = (email: string): number => {
-    // Only return counts for real connected users
-    if (connectedUsers.includes(email)) {
-      return userCharCounts[email] || 0;
-    }
-    // Always return 0 for simulated users
-    return 0;
+    return userCharCounts[email] || 0;
   };
   
-  // Always show the current user first, then real connected users, then simulated users
-  const sortedUsers = [...allUsers].sort((a, b) => {
+  // Always show the current user first, then other connected users
+  const sortedUsers = [...connectedUsers].sort((a, b) => {
     // Current user always first
     if (a === currentUserEmail) return -1;
     if (b === currentUserEmail) return 1;
-    
-    // Real connected users before simulated ones
-    const aIsConnected = connectedUsers.includes(a);
-    const bIsConnected = connectedUsers.includes(b);
-    
-    if (aIsConnected && !bIsConnected) return -1;
-    if (!aIsConnected && bIsConnected) return 1;
     
     // Otherwise alphabetical
     return a.localeCompare(b);
@@ -124,8 +112,7 @@ const PlayersBar: React.FC<PlayersBarProps> = ({
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center">
               <h3 className="text-base font-medium text-white">
-                Warriors: ({connectedUsers.length} connected
-                {extraPlayers.length > 0 && `, ${extraPlayers.length} simulated`})
+                Warriors: ({connectedUsers.length} connected)
               </h3>
             </div>
             
