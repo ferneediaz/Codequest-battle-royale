@@ -348,7 +348,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
             <option value="python">Python</option>
           </select>
         </div>
-        <span className="text-gray-500">Time: {timeRemaining}</span>
       </div>
       
       <div className="relative">
